@@ -68,7 +68,7 @@ Plan and deliver all seven improvements for `RavenMeld/AI-ToolKit-MCP`:
 - #2 minimal `mcp_http_server.py`
 
 ### Tasks
-- Add lightweight FastAPI wrapper:
+- Add lightweight `aiohttp` wrapper:
   - `/health`
   - `/tools` (list tool names/docs)
   - `/mcp/tool` (execute tool by name + args)
@@ -196,7 +196,7 @@ Plan and deliver all seven improvements for `RavenMeld/AI-ToolKit-MCP`:
 - [x] Planning document created
 - [x] Phase 0 baseline capture
 - [x] Phase 1 dependencies
-- [ ] Phase 2 HTTP wrapper
+- [x] Phase 2 HTTP wrapper
 - [ ] Phase 3 docs/examples/schemas
 - [ ] Phase 4 smoke test
 - [ ] Phase 5 CI
@@ -221,3 +221,19 @@ Plan and deliver all seven improvements for `RavenMeld/AI-ToolKit-MCP`:
   - `python -m py_compile mcp_server.py` -> pass
   - `python -m unittest discover -s tests -p 'test_*.py'` -> `Ran 7 tests ... OK`
 - Result: dependency/runtime foundation is reproducible and green.
+
+## Phase 2 Results
+- Added minimal HTTP entrypoint:
+  - `mcp_http_server.py`
+  - Endpoints: `GET /health`, `GET /tools`, `POST /mcp/tool`
+  - Delegates execution to existing handlers in `mcp_server.py` (`handle_list_tools`, `handle_call_tool`)
+  - Includes structured error payloads (`INVALID_JSON`, `INVALID_REQUEST`, `TOOL_NOT_FOUND`, `TOOL_EXECUTION_FAILED`)
+- Added HTTP wrapper tests:
+  - `tests/test_http_wrapper_basic.py`
+  - Covers health endpoint, successful tool execution path, and unknown-tool path
+- Updated docs:
+  - README now includes HTTP bridge startup and endpoint usage
+- Validation:
+  - `python -m py_compile mcp_server.py mcp_http_server.py` -> pass
+  - `python -m unittest discover -s tests -p 'test_*.py'` -> `Ran 10 tests ... OK`
+- Result: HTTP wrapper is implemented, documented, and covered by tests.

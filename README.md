@@ -4,6 +4,7 @@ AI ToolKit MCP is a Python MCP server that wraps an AI Toolkit training backend 
 
 This repository is intentionally focused:
 - `mcp_server.py` contains the MCP server and tool implementations.
+- `mcp_http_server.py` provides a lightweight HTTP bridge over the same tool handlers.
 - `tests/` contains contract and scoring/provenance tests.
 
 ## What You Get
@@ -34,7 +35,13 @@ export LOG_LEVEL=INFO
 python mcp_server.py
 ```
 
-4. Register this command in your MCP client and call `get-training-observability` with a `job_id`.
+4. Optional: start the HTTP bridge (health + tool execution endpoints):
+
+```bash
+python mcp_http_server.py --host 127.0.0.1 --port 8080
+```
+
+5. Register this command in your MCP client and call `get-training-observability` with a `job_id`.
 
 ## Architecture At A Glance
 
@@ -216,6 +223,17 @@ python mcp_server.py
 
 The process starts an MCP stdio server (`server_name=ai-toolkit-mcp`).
 
+## Run The HTTP Bridge
+
+```bash
+python mcp_http_server.py --host 127.0.0.1 --port 8080
+```
+
+Endpoints:
+- `GET /health`
+- `GET /tools`
+- `POST /mcp/tool` with body: `{"name":"<tool-name>","arguments":{...}}`
+
 ## MCP Client Wiring (Example)
 
 Example MCP command configuration:
@@ -242,16 +260,18 @@ python -m unittest discover -s tests -p 'test_*.py'
 Current test modules:
 - `tests/test_timeseries_compare_helpers.py`
 - `tests/test_observability_schema_contract.py`
+- `tests/test_http_wrapper_basic.py`
 
 Optional syntax check:
 
 ```bash
-python -m py_compile mcp_server.py
+python -m py_compile mcp_server.py mcp_http_server.py
 ```
 
 ## Repository Layout
 
 - `mcp_server.py`: MCP server, tool schemas, tool handlers, intelligence/scoring helpers
+- `mcp_http_server.py`: minimal HTTP wrapper delegating to the same MCP tool handlers
 - `tests/`: contract and helper tests
 
 ## Contract Stability Notes
