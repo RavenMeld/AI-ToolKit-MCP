@@ -13,7 +13,7 @@ Add an optional, backward-compatible auth requirement for `GET /health` in `mcp_
 - [x] Add CLI/env wiring for the new toggle.
 - [x] Add test coverage for default-open and protected `/health` behavior.
 - [x] Update README and changelog.
-- [ ] Run validations and push.
+- [x] Run validations and push.
 
 ## Decisions (with rationale)
 1. Keep `/health` open by default.
@@ -48,4 +48,5 @@ Expected: all commands succeed with zero failures.
   - `python -m py_compile mcp_server.py mcp_http_server.py`
   - `python -m unittest tests.test_http_wrapper_basic` (`Ran 18 tests ... OK`)
   - `python -m unittest discover -s tests -p 'test_*.py'` (`Ran 28 tests ... OK`)
-- Push status: pending.
+- Changes pushed to `RavenMeld/AI-ToolKit-MCP` `main` in commit:
+  - `37cee83` (`feat(http): add optional auth for /health endpoint`)
