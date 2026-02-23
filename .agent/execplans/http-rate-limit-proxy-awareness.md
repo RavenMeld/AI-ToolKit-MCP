@@ -9,7 +9,7 @@ Add optional proxy-aware client identity extraction for `POST /mcp/tool` rate li
 - [x] Add tests for trusted vs untrusted proxy header behavior.
 - [x] Update README and changelog.
 - [x] Run validations.
-- [ ] Push.
+- [x] Push.
 
 ## Decisions (with rationale)
 1. Default: do not trust proxy headers.
@@ -46,4 +46,5 @@ Expected: both succeed (distinct client keys).
   - `python -m py_compile mcp_server.py mcp_http_server.py`
   - `python -m unittest tests.test_http_wrapper_basic` (`Ran 22 tests ... OK`)
   - `python -m unittest discover -s tests -p 'test_*.py'` (`Ran 32 tests ... OK`)
-- Push status: pending.
+- Changes pushed to `RavenMeld/AI-ToolKit-MCP` `main` in commit:
+  - `72f6144` (`feat(http): add optional proxy-aware rate-limit client identity`)
