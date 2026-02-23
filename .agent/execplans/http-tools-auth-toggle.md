@@ -9,7 +9,7 @@ Add an optional, backward-compatible auth requirement for `GET /tools` in `mcp_h
 - [x] Added CLI/env wiring for the new toggle.
 - [x] Added test coverage for default-open and protected `/tools` behavior.
 - [x] Updated README and changelog.
-- [ ] Run full validations and push.
+- [x] Run full validations and push.
 
 ## Decisions (with rationale)
 1. Keep `/tools` open by default.
@@ -46,4 +46,9 @@ Expected: full suite passes.
 `curl -i -H 'X-API-Key: change-me' http://127.0.0.1:8080/tools`
 
 ## Final Results
-Pending validation and push.
+- Validation completed successfully:
+  - `python -m py_compile mcp_server.py mcp_http_server.py`
+  - `python -m unittest tests.test_http_wrapper_basic` (`Ran 15 tests ... OK`)
+  - `python -m unittest discover -s tests -p 'test_*.py'` (`Ran 25 tests ... OK`)
+- Changes pushed to `RavenMeld/AI-ToolKit-MCP` `main` in commit:
+  - `38c02fc` (`feat(http): add optional auth for /tools endpoint`)
