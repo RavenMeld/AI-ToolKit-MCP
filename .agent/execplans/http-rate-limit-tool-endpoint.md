@@ -9,7 +9,7 @@ Add optional per-client rate limiting to `POST /mcp/tool` in `mcp_http_server.py
 - [x] Add tests for 429 behavior and retry hint.
 - [x] Update README and changelog.
 - [x] Run validations.
-- [ ] Push.
+- [x] Push.
 
 ## Decisions (with rationale)
 1. Default disabled.
@@ -40,4 +40,5 @@ Expected: first two succeed, third returns `429` with `RATE_LIMITED`.
   - `python -m py_compile mcp_server.py mcp_http_server.py`
   - `python -m unittest tests.test_http_wrapper_basic` (`Ran 20 tests ... OK`)
   - `python -m unittest discover -s tests -p 'test_*.py'` (`Ran 30 tests ... OK`)
-- Push status: pending.
+- Changes pushed to `RavenMeld/AI-ToolKit-MCP` `main` in commit:
+  - `dec2402` (`feat(http): add optional per-client rate limiting for /mcp/tool`)
