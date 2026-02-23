@@ -14,6 +14,7 @@ from mcp_server import MCP_TOOLS, handle_call_tool, handle_list_tools
 
 logger = logging.getLogger(__name__)
 AUTH_TOKEN_KEY = web.AppKey("auth_token", Optional[str])
+AUTH_FOR_HEALTH_KEY = web.AppKey("auth_for_health", bool)
 AUTH_FOR_TOOLS_KEY = web.AppKey("auth_for_tools", bool)
 TOOL_TIMEOUT_SECONDS_KEY = web.AppKey("tool_timeout_seconds", float)
 MAX_BODY_BYTES_KEY = web.AppKey("max_body_bytes", int)
@@ -197,6 +198,11 @@ async def _error_middleware(
 
 async def health_handler(_request: web.Request) -> web.Response:
     request_id = _request_id_from_request(_request)
+    if bool(_request.app.get(AUTH_FOR_HEALTH_KEY, False)):
+        authorized, auth_error = _require_auth(_request)
+        if not authorized:
+            return _auth_error_response(request_id, auth_error)
+
     auth_enabled = bool(_request.app.get(AUTH_TOKEN_KEY))
     return web.json_response(
         {
@@ -328,6 +334,7 @@ async def mcp_tool_handler(request: web.Request) -> web.Response:
 
 def create_app(
     auth_token: Optional[str] = None,
+    auth_for_health: bool = False,
     auth_for_tools: bool = False,
     tool_timeout_seconds: float = 120.0,
     max_body_bytes: int = 1024 * 1024,
@@ -336,6 +343,7 @@ def create_app(
     safe_max_body = max(1, int(max_body_bytes))
     app = web.Application(client_max_size=safe_max_body, middlewares=[_error_middleware])
     app[AUTH_TOKEN_KEY] = auth_token.strip() if isinstance(auth_token, str) and auth_token.strip() else None
+    app[AUTH_FOR_HEALTH_KEY] = bool(auth_for_health)
     app[AUTH_FOR_TOOLS_KEY] = bool(auth_for_tools)
     app[TOOL_TIMEOUT_SECONDS_KEY] = safe_timeout
     app[MAX_BODY_BYTES_KEY] = safe_max_body
@@ -354,6 +362,21 @@ def _parse_args() -> argparse.Namespace:
         default=os.getenv("MCP_HTTP_AUTH_TOKEN"),
         help="Optional auth token accepted via Authorization: Bearer <token> or X-API-Key.",
     )
+    auth_for_health_default = _parse_env_bool(os.getenv("MCP_HTTP_AUTH_FOR_HEALTH"), default=False)
+    auth_for_health_group = parser.add_mutually_exclusive_group()
+    auth_for_health_group.add_argument(
+        "--auth-for-health",
+        dest="auth_for_health",
+        action="store_true",
+        help="Require the auth token on GET /health as well.",
+    )
+    auth_for_health_group.add_argument(
+        "--no-auth-for-health",
+        dest="auth_for_health",
+        action="store_false",
+        help="Disable auth requirement on GET /health.",
+    )
+    parser.set_defaults(auth_for_health=auth_for_health_default)
     auth_for_tools_default = _parse_env_bool(os.getenv("MCP_HTTP_AUTH_FOR_TOOLS"), default=False)
     auth_for_tools_group = parser.add_mutually_exclusive_group()
     auth_for_tools_group.add_argument(
@@ -393,12 +416,14 @@ def main() -> None:
     auth_enabled = bool(args.auth_token)
     logger.info("Starting HTTP wrapper on %s:%s", args.host, args.port)
     logger.info("HTTP auth is %s", "enabled" if auth_enabled else "disabled")
+    logger.info("GET /health auth is %s", "enabled" if bool(args.auth_for_health) else "disabled")
     logger.info("GET /tools auth is %s", "enabled" if bool(args.auth_for_tools) else "disabled")
     logger.info("Tool timeout: %.2fs", max(0.01, float(args.tool_timeout_seconds)))
     logger.info("Max request body bytes: %d", max(1, int(args.max_body_bytes)))
     web.run_app(
         create_app(
             auth_token=args.auth_token,
+            auth_for_health=args.auth_for_health,
             auth_for_tools=args.auth_for_tools,
             tool_timeout_seconds=args.tool_timeout_seconds,
             max_body_bytes=args.max_body_bytes,

@@ -154,6 +154,37 @@ class HttpWrapperAuthTests(AioHTTPTestCase):
         self.assertEqual(payload["data"]["ok"], True)
 
 
+class HttpWrapperHealthEndpointAuthTests(AioHTTPTestCase):
+    async def get_application(self):
+        return create_app(auth_token="secret-token")
+
+    async def test_health_endpoint_remains_open_by_default(self):
+        response = await self.client.get("/health")
+        self.assertEqual(response.status, 200)
+        payload = await response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "healthy")
+
+
+class HttpWrapperHealthEndpointProtectedTests(AioHTTPTestCase):
+    async def get_application(self):
+        return create_app(auth_token="secret-token", auth_for_health=True)
+
+    async def test_health_endpoint_requires_auth_when_enabled(self):
+        response = await self.client.get("/health")
+        self.assertEqual(response.status, 401)
+        payload = await response.json()
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "AUTH_REQUIRED")
+
+    async def test_health_endpoint_accepts_api_key_when_enabled(self):
+        response = await self.client.get("/health", headers={"X-API-Key": "secret-token"})
+        self.assertEqual(response.status, 200)
+        payload = await response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "healthy")
+
+
 class HttpWrapperToolsEndpointAuthTests(AioHTTPTestCase):
     async def get_application(self):
         return create_app(auth_token="secret-token")
