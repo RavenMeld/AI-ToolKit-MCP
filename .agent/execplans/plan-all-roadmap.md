@@ -195,7 +195,7 @@ Plan and deliver all seven improvements for `RavenMeld/AI-ToolKit-MCP`:
 ## Progress Log
 - [x] Planning document created
 - [x] Phase 0 baseline capture
-- [ ] Phase 1 dependencies
+- [x] Phase 1 dependencies
 - [ ] Phase 2 HTTP wrapper
 - [ ] Phase 3 docs/examples/schemas
 - [ ] Phase 4 smoke test
@@ -210,3 +210,14 @@ Plan and deliver all seven improvements for `RavenMeld/AI-ToolKit-MCP`:
   - `python -m py_compile mcp_server.py` -> pass
   - `python -m unittest discover -s tests -p 'test_*.py'` -> `Ran 7 tests ... OK`
 - Result: baseline is green and ready for implementation Phase 1.
+
+## Phase 1 Results
+- Added pinned dependency manifest:
+  - `requirements.txt`
+- Updated README install guidance to use pinned dependencies:
+  - `python -m pip install -r requirements.txt`
+- Validation:
+  - `python -m pip install -r requirements.txt --disable-pip-version-check` -> pass
+  - `python -m py_compile mcp_server.py` -> pass
+  - `python -m unittest discover -s tests -p 'test_*.py'` -> `Ran 7 tests ... OK`
+- Result: dependency/runtime foundation is reproducible and green.

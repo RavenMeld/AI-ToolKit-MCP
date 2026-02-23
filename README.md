@@ -18,7 +18,7 @@ This repository is intentionally focused:
 1. Install runtime dependencies:
 
 ```bash
-python -m pip install mcp aiohttp websockets pydantic pyyaml Pillow
+python -m pip install -r requirements.txt
 ```
 
 2. Point the MCP server at your AI Toolkit backend:
@@ -188,18 +188,10 @@ Returns rank ordering plus explainability deltas against the winner.
 - A reachable AI Toolkit server (`AI_TOOLKIT_SERVER_URL`)
 - Valid filesystem mounts for dataset/output/config paths expected by the backend
 
-Python packages required by `mcp_server.py` include:
-- `mcp`
-- `aiohttp`
-- `websockets`
-- `pydantic`
-- `pyyaml`
-- `Pillow`
-
-Example install:
+Install pinned dependencies:
 
 ```bash
-python -m pip install mcp aiohttp websockets pydantic pyyaml Pillow
+python -m pip install -r requirements.txt
 ```
 
 ## Configuration
