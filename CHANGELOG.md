@@ -12,6 +12,10 @@ All notable changes to this project are documented in this file.
 - Optional `/health` auth enforcement toggle:
   - env: `MCP_HTTP_AUTH_FOR_HEALTH=true`
   - CLI: `--auth-for-health` / `--no-auth-for-health`
+- Optional per-client rate limiting on `POST /mcp/tool`:
+  - env: `MCP_HTTP_RATE_LIMIT_ENABLED=true`
+  - CLI: `--rate-limit-enabled` / `--no-rate-limit`
+  - tunables: `MCP_HTTP_RATE_LIMIT_WINDOW_SECONDS`, `MCP_HTTP_RATE_LIMIT_MAX_REQUESTS`
 - New HTTP wrapper tests for:
   - request ID echo behavior
   - malformed JSON request handling
@@ -20,6 +24,7 @@ All notable changes to this project are documented in this file.
   - `/tools` protected behavior when auth toggle is enabled
   - `/health` default-open compatibility behavior
   - `/health` protected behavior when auth toggle is enabled
+  - `RATE_LIMITED` (`429`) behavior for `POST /mcp/tool`
 
 ### Changed
 - HTTP wrapper now emits structured JSON errors for framework-level HTTP exceptions

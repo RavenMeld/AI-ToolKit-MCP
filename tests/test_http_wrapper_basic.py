@@ -250,5 +250,48 @@ class HttpWrapperHardeningTests(AioHTTPTestCase):
         self.assertEqual(payload["error"]["details"]["max_body_bytes"], 128)
 
 
+class HttpWrapperRateLimitTests(AioHTTPTestCase):
+    async def get_application(self):
+        return create_app(
+            rate_limit_enabled=True,
+            rate_limit_window_seconds=60,
+            rate_limit_max_requests=2,
+        )
+
+    async def test_tool_rate_limit_after_threshold(self):
+        mocked_result = [types.TextContent(type="text", text='{"ok":true}')]
+        with patch(
+            "mcp_http_server.handle_call_tool",
+            new=AsyncMock(return_value=mocked_result),
+        ) as mocked_handle:
+            first = await self.client.post("/mcp/tool", json={"name": "list-configs", "arguments": {}})
+            second = await self.client.post("/mcp/tool", json={"name": "list-configs", "arguments": {}})
+            third = await self.client.post("/mcp/tool", json={"name": "list-configs", "arguments": {}})
+
+        self.assertEqual(first.status, 200)
+        self.assertEqual(second.status, 200)
+        self.assertEqual(third.status, 429)
+        self.assertEqual(mocked_handle.await_count, 2)
+        payload = await third.json()
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "RATE_LIMITED")
+        self.assertEqual(payload["error"]["details"]["max_requests"], 2)
+        self.assertGreaterEqual(payload["error"]["details"]["retry_after_seconds"], 1)
+        self.assertEqual(third.headers.get("Retry-After"), str(payload["error"]["details"]["retry_after_seconds"]))
+
+    async def test_health_not_rate_limited(self):
+        mocked_result = [types.TextContent(type="text", text='{"ok":true}')]
+        with patch("mcp_http_server.handle_call_tool", new=AsyncMock(return_value=mocked_result)):
+            await self.client.post("/mcp/tool", json={"name": "list-configs", "arguments": {}})
+            await self.client.post("/mcp/tool", json={"name": "list-configs", "arguments": {}})
+            await self.client.post("/mcp/tool", json={"name": "list-configs", "arguments": {}})
+
+        response = await self.client.get("/health")
+        self.assertEqual(response.status, 200)
+        payload = await response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "healthy")
+
+
 if __name__ == "__main__":
     unittest.main()

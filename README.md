@@ -80,6 +80,9 @@ export MCP_HTTP_TOOL_TIMEOUT_SECONDS=120
 export MCP_HTTP_MAX_BODY_BYTES=1048576
 export MCP_HTTP_AUTH_FOR_HEALTH=false
 export MCP_HTTP_AUTH_FOR_TOOLS=false
+export MCP_HTTP_RATE_LIMIT_ENABLED=false
+export MCP_HTTP_RATE_LIMIT_WINDOW_SECONDS=60
+export MCP_HTTP_RATE_LIMIT_MAX_REQUESTS=120
 python mcp_http_server.py --host 127.0.0.1 --port 8080
 ```
 
@@ -615,6 +618,9 @@ Environment variables used by the server:
 - `MCP_HTTP_AUTH_TOKEN` (optional auth token for `/mcp/tool`)
 - `MCP_HTTP_AUTH_FOR_HEALTH` (default: `false`, when `true` also protects `/health`)
 - `MCP_HTTP_AUTH_FOR_TOOLS` (default: `false`, when `true` also protects `/tools`)
+- `MCP_HTTP_RATE_LIMIT_ENABLED` (default: `false`, enables rate limiting on `POST /mcp/tool`)
+- `MCP_HTTP_RATE_LIMIT_WINDOW_SECONDS` (default: `60`)
+- `MCP_HTTP_RATE_LIMIT_MAX_REQUESTS` (default: `120`)
 - `MCP_HTTP_TOOL_TIMEOUT_SECONDS` (default: `120`)
 - `MCP_HTTP_MAX_BODY_BYTES` (default: `1048576` / `1MB`)
 
@@ -642,6 +648,9 @@ CLI flags:
 - `--auth-token`
 - `--auth-for-health` / `--no-auth-for-health`
 - `--auth-for-tools` / `--no-auth-for-tools`
+- `--rate-limit-enabled` / `--no-rate-limit`
+- `--rate-limit-window-seconds`
+- `--rate-limit-max-requests`
 - `--tool-timeout-seconds`
 - `--max-body-bytes`
 
@@ -662,8 +671,16 @@ Auth for `GET /tools` is optional:
 - disabled by default for compatibility
 - enable with `MCP_HTTP_AUTH_FOR_TOOLS=true` or `--auth-for-tools`
 
+Rate limiting for `POST /mcp/tool` is optional:
+- disabled by default for compatibility
+- enable with `MCP_HTTP_RATE_LIMIT_ENABLED=true` or `--rate-limit-enabled`
+- tune with:
+  - `MCP_HTTP_RATE_LIMIT_WINDOW_SECONDS` / `--rate-limit-window-seconds`
+  - `MCP_HTTP_RATE_LIMIT_MAX_REQUESTS` / `--rate-limit-max-requests`
+
 Hardening error codes:
 - `INVALID_JSON` (`400`) when request body is not valid JSON
+- `RATE_LIMITED` (`429`) when per-client request limit is exceeded for `POST /mcp/tool`
 - `TOOL_TIMEOUT` (`504`) when execution exceeds `MCP_HTTP_TOOL_TIMEOUT_SECONDS`
 - `PAYLOAD_TOO_LARGE` (`413`) when body exceeds `MCP_HTTP_MAX_BODY_BYTES`
 - `HTTP_<status>` for framework-level HTTP errors (for example `HTTP_404`)

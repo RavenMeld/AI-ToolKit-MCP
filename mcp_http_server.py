@@ -4,7 +4,9 @@ import asyncio
 import hmac
 import json
 import logging
+import math
 import os
+import time
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -18,6 +20,10 @@ AUTH_FOR_HEALTH_KEY = web.AppKey("auth_for_health", bool)
 AUTH_FOR_TOOLS_KEY = web.AppKey("auth_for_tools", bool)
 TOOL_TIMEOUT_SECONDS_KEY = web.AppKey("tool_timeout_seconds", float)
 MAX_BODY_BYTES_KEY = web.AppKey("max_body_bytes", int)
+RATE_LIMIT_ENABLED_KEY = web.AppKey("rate_limit_enabled", bool)
+RATE_LIMIT_WINDOW_SECONDS_KEY = web.AppKey("rate_limit_window_seconds", float)
+RATE_LIMIT_MAX_REQUESTS_KEY = web.AppKey("rate_limit_max_requests", int)
+RATE_LIMIT_STATE_KEY = web.AppKey("rate_limit_state", Dict[str, Dict[str, Any]])
 REQUEST_ID_KEY = web.AppKey("request_id", str)
 
 
@@ -27,6 +33,7 @@ def _error_response(
     message: str,
     request_id: str,
     details: Dict[str, Any] | None = None,
+    headers: Dict[str, str] | None = None,
 ) -> web.Response:
     payload: Dict[str, Any] = {
         "ok": False,
@@ -38,7 +45,7 @@ def _error_response(
     }
     if details is not None:
         payload["error"]["details"] = details
-    return web.json_response(payload, status=status)
+    return web.json_response(payload, status=status, headers=headers)
 
 
 def _serialize_mcp_content(content: Any) -> Dict[str, Any]:
@@ -166,6 +173,64 @@ def _normalize_tool_data(serialized_items: List[Dict[str, Any]]) -> Any:
     return {"items": parsed_items}
 
 
+def _client_identity(request: web.Request) -> str:
+    return request.remote or "unknown"
+
+
+def _prune_rate_limit_state(
+    state: Dict[str, Dict[str, Any]],
+    now_ts: float,
+    window_seconds: float,
+) -> None:
+    if len(state) < 1024:
+        return
+    stale_cutoff = now_ts - (window_seconds * 2.0)
+    stale_keys = [
+        key
+        for key, entry in state.items()
+        if float(entry.get("window_start", 0.0)) < stale_cutoff
+    ]
+    for key in stale_keys:
+        state.pop(key, None)
+
+
+def _check_rate_limit(request: web.Request) -> Dict[str, Any] | None:
+    if not bool(request.app.get(RATE_LIMIT_ENABLED_KEY, False)):
+        return None
+
+    window_seconds = max(1.0, float(request.app.get(RATE_LIMIT_WINDOW_SECONDS_KEY, 60.0) or 60.0))
+    max_requests = max(1, int(request.app.get(RATE_LIMIT_MAX_REQUESTS_KEY, 120) or 120))
+    now_ts = time.monotonic()
+    state = request.app.get(RATE_LIMIT_STATE_KEY, {})
+    _prune_rate_limit_state(state, now_ts, window_seconds)
+
+    client_key = _client_identity(request)
+    entry = state.get(client_key)
+
+    if entry is None:
+        state[client_key] = {"window_start": now_ts, "count": 1}
+        return None
+
+    window_start = float(entry.get("window_start", now_ts))
+    elapsed = now_ts - window_start
+    if elapsed >= window_seconds:
+        entry["window_start"] = now_ts
+        entry["count"] = 1
+        return None
+
+    count = int(entry.get("count", 0))
+    if count >= max_requests:
+        retry_after_seconds = max(1, int(math.ceil(window_seconds - elapsed)))
+        return {
+            "retry_after_seconds": retry_after_seconds,
+            "window_seconds": window_seconds,
+            "max_requests": max_requests,
+        }
+
+    entry["count"] = count + 1
+    return None
+
+
 @web.middleware
 async def _error_middleware(
     request: web.Request,
@@ -240,6 +305,18 @@ async def mcp_tool_handler(request: web.Request) -> web.Response:
     authorized, auth_error = _require_auth(request)
     if not authorized:
         return _auth_error_response(request_id, auth_error)
+
+    rate_limit_result = _check_rate_limit(request)
+    if rate_limit_result is not None:
+        retry_after_seconds = int(rate_limit_result["retry_after_seconds"])
+        return _error_response(
+            429,
+            "RATE_LIMITED",
+            "Too many requests for this client.",
+            request_id=request_id,
+            details=rate_limit_result,
+            headers={"Retry-After": str(retry_after_seconds)},
+        )
 
     try:
         raw_body = await request.text()
@@ -338,15 +415,24 @@ def create_app(
     auth_for_tools: bool = False,
     tool_timeout_seconds: float = 120.0,
     max_body_bytes: int = 1024 * 1024,
+    rate_limit_enabled: bool = False,
+    rate_limit_window_seconds: float = 60.0,
+    rate_limit_max_requests: int = 120,
 ) -> web.Application:
     safe_timeout = max(0.01, float(tool_timeout_seconds))
     safe_max_body = max(1, int(max_body_bytes))
+    safe_rate_limit_window_seconds = max(1.0, float(rate_limit_window_seconds))
+    safe_rate_limit_max_requests = max(1, int(rate_limit_max_requests))
     app = web.Application(client_max_size=safe_max_body, middlewares=[_error_middleware])
     app[AUTH_TOKEN_KEY] = auth_token.strip() if isinstance(auth_token, str) and auth_token.strip() else None
     app[AUTH_FOR_HEALTH_KEY] = bool(auth_for_health)
     app[AUTH_FOR_TOOLS_KEY] = bool(auth_for_tools)
     app[TOOL_TIMEOUT_SECONDS_KEY] = safe_timeout
     app[MAX_BODY_BYTES_KEY] = safe_max_body
+    app[RATE_LIMIT_ENABLED_KEY] = bool(rate_limit_enabled)
+    app[RATE_LIMIT_WINDOW_SECONDS_KEY] = safe_rate_limit_window_seconds
+    app[RATE_LIMIT_MAX_REQUESTS_KEY] = safe_rate_limit_max_requests
+    app[RATE_LIMIT_STATE_KEY] = {}
     app.router.add_get("/health", health_handler)
     app.router.add_get("/tools", tools_handler)
     app.router.add_post("/mcp/tool", mcp_tool_handler)
@@ -392,6 +478,33 @@ def _parse_args() -> argparse.Namespace:
         help="Disable auth requirement on GET /tools.",
     )
     parser.set_defaults(auth_for_tools=auth_for_tools_default)
+    rate_limit_enabled_default = _parse_env_bool(os.getenv("MCP_HTTP_RATE_LIMIT_ENABLED"), default=False)
+    rate_limit_enabled_group = parser.add_mutually_exclusive_group()
+    rate_limit_enabled_group.add_argument(
+        "--rate-limit-enabled",
+        dest="rate_limit_enabled",
+        action="store_true",
+        help="Enable per-client rate limiting for POST /mcp/tool.",
+    )
+    rate_limit_enabled_group.add_argument(
+        "--no-rate-limit",
+        dest="rate_limit_enabled",
+        action="store_false",
+        help="Disable per-client rate limiting for POST /mcp/tool.",
+    )
+    parser.set_defaults(rate_limit_enabled=rate_limit_enabled_default)
+    parser.add_argument(
+        "--rate-limit-window-seconds",
+        type=float,
+        default=float(os.getenv("MCP_HTTP_RATE_LIMIT_WINDOW_SECONDS", "60")),
+        help="Rate-limit window size for POST /mcp/tool.",
+    )
+    parser.add_argument(
+        "--rate-limit-max-requests",
+        type=int,
+        default=int(os.getenv("MCP_HTTP_RATE_LIMIT_MAX_REQUESTS", "120")),
+        help="Maximum requests per client within the rate-limit window for POST /mcp/tool.",
+    )
     parser.add_argument(
         "--tool-timeout-seconds",
         type=float,
@@ -418,6 +531,12 @@ def main() -> None:
     logger.info("HTTP auth is %s", "enabled" if auth_enabled else "disabled")
     logger.info("GET /health auth is %s", "enabled" if bool(args.auth_for_health) else "disabled")
     logger.info("GET /tools auth is %s", "enabled" if bool(args.auth_for_tools) else "disabled")
+    logger.info(
+        "POST /mcp/tool rate limit is %s (window=%ss, max_requests=%s)",
+        "enabled" if bool(args.rate_limit_enabled) else "disabled",
+        max(1.0, float(args.rate_limit_window_seconds)),
+        max(1, int(args.rate_limit_max_requests)),
+    )
     logger.info("Tool timeout: %.2fs", max(0.01, float(args.tool_timeout_seconds)))
     logger.info("Max request body bytes: %d", max(1, int(args.max_body_bytes)))
     web.run_app(
@@ -427,6 +546,9 @@ def main() -> None:
             auth_for_tools=args.auth_for_tools,
             tool_timeout_seconds=args.tool_timeout_seconds,
             max_body_bytes=args.max_body_bytes,
+            rate_limit_enabled=args.rate_limit_enabled,
+            rate_limit_window_seconds=args.rate_limit_window_seconds,
+            rate_limit_max_requests=args.rate_limit_max_requests,
         ),
         host=args.host,
         port=args.port,
