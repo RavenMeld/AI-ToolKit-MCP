@@ -200,7 +200,7 @@ Plan and deliver all seven improvements for `RavenMeld/AI-ToolKit-MCP`:
 - [x] Phase 3 docs/examples/schemas
 - [x] Phase 4 smoke test
 - [x] Phase 5 CI
-- [ ] Phase 6 release tag
+- [x] Phase 6 release tag
 
 ## Phase 0 Results
 - Branch state:
@@ -270,3 +270,10 @@ Plan and deliver all seven improvements for `RavenMeld/AI-ToolKit-MCP`:
   - `python -m py_compile mcp_server.py mcp_http_server.py` -> pass
   - `python -m unittest discover -s tests -p 'test_*.py'` -> `Ran 11 tests ... OK`
 - Result: repository now has an enforceable quality gate for syntax and tests.
+
+## Phase 6 Results
+- Release tag created and pushed:
+  - Annotated tag: `v0.1.0`
+  - Tagged commit: `74cbf49` (`docs/tests/ci: complete roadmap phases 3-5`)
+  - Remote: `ravenmeld-ai` (`git@github-ravenmeld:RavenMeld/AI-ToolKit-MCP.git`)
+- Result: `v0.1.0` release marker is now published.
