@@ -1,0 +1,448 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "get-training-observability output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "analysis_mode",
+    "inputs",
+    "run_report",
+    "evaluation",
+    "intelligence",
+    "next_experiment",
+    "baseline_comparison",
+    "speed_analysis",
+    "quality_analysis",
+    "error_analysis",
+    "dataset_analysis",
+    "nlp_analysis",
+    "alerts"
+  ],
+  "properties": {
+    "analysis_mode": {
+      "const": "deep_log_intelligence"
+    },
+    "job_id": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "overall_health": {
+      "type": "string"
+    },
+    "status_snapshot": {
+      "type": "object"
+    },
+    "system_snapshot": {
+      "type": "object"
+    },
+    "config_context": {
+      "type": "object"
+    },
+    "logs": {
+      "type": "object"
+    },
+    "dataset_resolution": {
+      "type": "object"
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "lines",
+        "include_dataset",
+        "include_nlp",
+        "include_raw_log_excerpt",
+        "excerpt_lines",
+        "max_dataset_files",
+        "include_evaluation",
+        "include_next_experiment",
+        "include_baseline_comparison",
+        "baseline_limit",
+        "baseline_job_ids",
+        "pass_threshold"
+      ],
+      "properties": {
+        "lines": {
+          "type": "integer"
+        },
+        "include_dataset": {
+          "type": "boolean"
+        },
+        "include_nlp": {
+          "type": "boolean"
+        },
+        "include_raw_log_excerpt": {
+          "type": "boolean"
+        },
+        "excerpt_lines": {
+          "type": "integer"
+        },
+        "max_dataset_files": {
+          "type": "integer"
+        },
+        "include_evaluation": {
+          "type": "boolean"
+        },
+        "include_next_experiment": {
+          "type": "boolean"
+        },
+        "include_baseline_comparison": {
+          "type": "boolean"
+        },
+        "baseline_limit": {
+          "type": "integer"
+        },
+        "baseline_job_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "pass_threshold": {
+          "type": "number"
+        }
+      }
+    },
+    "run_report": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "job_id",
+        "metrics",
+        "quality_analysis",
+        "speed_analysis",
+        "error_analysis",
+        "dataset_analysis",
+        "nlp_analysis",
+        "alerts"
+      ],
+      "properties": {
+        "job_id": {
+          "type": "string"
+        },
+        "metrics": {
+          "type": "object"
+        },
+        "quality_analysis": {
+          "type": "object"
+        },
+        "speed_analysis": {
+          "type": "object"
+        },
+        "error_analysis": {
+          "type": "object"
+        },
+        "dataset_analysis": {
+          "type": "object"
+        },
+        "nlp_analysis": {
+          "type": "object"
+        },
+        "alerts": {
+          "type": "array"
+        }
+      }
+    },
+    "evaluation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "skipped"
+          ],
+          "properties": {
+            "skipped": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "overall_score",
+            "grade",
+            "passed",
+            "pass_threshold",
+            "components",
+            "weights",
+            "diagnostics"
+          ],
+          "properties": {
+            "overall_score": {
+              "type": "number"
+            },
+            "grade": {
+              "type": "string"
+            },
+            "passed": {
+              "type": "boolean"
+            },
+            "pass_threshold": {
+              "type": "number"
+            },
+            "components": {
+              "type": "object"
+            },
+            "weights": {
+              "type": "object"
+            },
+            "diagnostics": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "intelligence": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "scores",
+        "bottlenecks",
+        "recommendations",
+        "decision_gates",
+        "thresholds",
+        "context",
+        "confidence"
+      ],
+      "properties": {
+        "scores": {
+          "type": "object"
+        },
+        "bottlenecks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "code",
+              "severity",
+              "message",
+              "confidence",
+              "confidence_source"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "confidence_source": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "recommendations": {
+          "type": "array"
+        },
+        "decision_gates": {
+          "type": "object"
+        },
+        "thresholds": {
+          "type": "object"
+        },
+        "context": {
+          "type": "object"
+        },
+        "confidence": {
+          "type": "number"
+        }
+      }
+    },
+    "next_experiment": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "skipped"
+          ],
+          "properties": {
+            "skipped": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "recommendation_type",
+            "parameter",
+            "current",
+            "proposed",
+            "expected_impact",
+            "risk_level",
+            "rationale",
+            "validation_plan"
+          ],
+          "properties": {
+            "recommendation_type": {
+              "type": "string"
+            },
+            "parameter": {
+              "type": "string"
+            },
+            "current": {},
+            "proposed": {},
+            "expected_impact": {
+              "type": "string"
+            },
+            "risk_level": {
+              "type": "string"
+            },
+            "rationale": {
+              "type": "string"
+            },
+            "validation_plan": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "baseline_comparison": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "skipped"
+          ],
+          "properties": {
+            "skipped": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "enabled"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "error": {
+              "type": "string"
+            },
+            "compared_job_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "skipped_baselines": {
+              "type": "array"
+            },
+            "position": {
+              "type": "object"
+            },
+            "ranking": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "ranking",
+                "winner_job_id",
+                "winner_score",
+                "score_spread"
+              ],
+              "properties": {
+                "ranking": {
+                  "type": "array"
+                },
+                "winner_job_id": {
+                  "type": "string"
+                },
+                "winner_score": {
+                  "type": "number"
+                },
+                "score_spread": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "speed_analysis": {
+      "type": "object"
+    },
+    "quality_analysis": {
+      "type": "object"
+    },
+    "error_analysis": {
+      "type": "object"
+    },
+    "dataset_analysis": {
+      "oneOf": [
+        {
+          "type": "object"
+        },
+        {
+          "type": "array"
+        }
+      ]
+    },
+    "nlp_analysis": {
+      "oneOf": [
+        {
+          "type": "object"
+        },
+        {
+          "type": "array"
+        }
+      ]
+    },
+    "alerts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "severity",
+          "category",
+          "message"
+        ],
+        "properties": {
+          "severity": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "raw_log_excerpt": {
+      "type": "string"
+    }
+  }
+}

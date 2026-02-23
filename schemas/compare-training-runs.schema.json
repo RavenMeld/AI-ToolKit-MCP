@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "compare-training-runs output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "generated_at",
+    "inputs",
+    "compared_count",
+    "skipped_runs",
+    "ranking"
+  ],
+  "properties": {
+    "generated_at": {
+      "type": "string"
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "job_ids",
+        "requested_job_ids",
+        "log_lines",
+        "include_dataset",
+        "include_nlp",
+        "only_terminal_runs"
+      ],
+      "properties": {
+        "job_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requested_job_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "log_lines": {
+          "type": "integer"
+        },
+        "include_dataset": {
+          "type": "boolean"
+        },
+        "include_nlp": {
+          "type": "boolean"
+        },
+        "only_terminal_runs": {
+          "type": "boolean"
+        }
+      }
+    },
+    "compared_count": {
+      "type": "integer"
+    },
+    "skipped_runs": {
+      "type": "array"
+    },
+    "ranking": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ranking",
+        "winner_job_id",
+        "winner_score",
+        "score_spread"
+      ],
+      "properties": {
+        "winner_job_id": {
+          "type": "string"
+        },
+        "winner_score": {
+          "type": "number"
+        },
+        "score_spread": {
+          "type": "number"
+        },
+        "ranking": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "job_id",
+              "scores",
+              "rank",
+              "delta_to_winner"
+            ],
+            "properties": {
+              "job_id": {
+                "type": "string"
+              },
+              "rank": {
+                "type": "integer"
+              },
+              "scores": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "total",
+                  "components",
+                  "weights"
+                ],
+                "properties": {
+                  "total": {
+                    "type": "number"
+                  },
+                  "components": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "convergence",
+                      "speed",
+                      "stability",
+                      "dataset"
+                    ],
+                    "properties": {
+                      "convergence": {
+                        "type": "number"
+                      },
+                      "speed": {
+                        "type": "number"
+                      },
+                      "stability": {
+                        "type": "number"
+                      },
+                      "dataset": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    }
+                  },
+                  "weights": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "convergence",
+                      "speed",
+                      "stability",
+                      "dataset"
+                    ],
+                    "properties": {
+                      "convergence": {
+                        "type": "number"
+                      },
+                      "speed": {
+                        "type": "number"
+                      },
+                      "stability": {
+                        "type": "number"
+                      },
+                      "dataset": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              },
+              "delta_to_winner": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "total",
+                  "total_band",
+                  "components",
+                  "component_bands",
+                  "band_source"
+                ],
+                "properties": {
+                  "total": {
+                    "type": "number"
+                  },
+                  "total_band": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "components": {
+                    "type": "object"
+                  },
+                  "component_bands": {
+                    "type": "object"
+                  },
+                  "band_source": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "units",
+                      "thresholds"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "units": {
+                        "type": "string"
+                      },
+                      "thresholds": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "negligible_lte",
+                          "moderate_lte",
+                          "large_gt"
+                        ],
+                        "properties": {
+                          "negligible_lte": {
+                            "type": "number"
+                          },
+                          "moderate_lte": {
+                            "type": "number"
+                          },
+                          "large_gt": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

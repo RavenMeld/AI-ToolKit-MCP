@@ -10,6 +10,12 @@ All notable changes to this project are documented in this file.
 - HTTP hardening controls:
   - `MCP_HTTP_TOOL_TIMEOUT_SECONDS` for per-request execution timeout
   - `MCP_HTTP_MAX_BODY_BYTES` for request body size limit
+- Versioned output schema files:
+  - `schemas/get-training-observability.schema.json`
+  - `schemas/compare-training-runs.schema.json`
+- Schema validation tests:
+  - `tests/test_output_schema_files.py`
+- `jsonschema` dependency for schema validation.
 
 ### Changed
 - Normalized HTTP tool response envelope now includes:

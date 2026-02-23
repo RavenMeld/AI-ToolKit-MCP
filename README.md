@@ -417,6 +417,10 @@ The server currently exposes these tools:
 
 ## Key Contracts
 
+Machine-readable schema files:
+- `schemas/get-training-observability.schema.json`
+- `schemas/compare-training-runs.schema.json`
+
 ### `get-training-observability`
 
 Primary one-call intelligence endpoint. Output includes:
@@ -679,6 +683,7 @@ Current test modules:
 - `tests/test_observability_schema_contract.py`
 - `tests/test_http_wrapper_basic.py`
 - `tests/test_get_training_observability_smoke.py`
+- `tests/test_output_schema_files.py`
 
 Optional syntax check:
 
@@ -690,6 +695,7 @@ python -m py_compile mcp_server.py mcp_http_server.py
 
 - `mcp_server.py`: MCP server, tool schemas, tool handlers, intelligence/scoring helpers
 - `mcp_http_server.py`: minimal HTTP wrapper delegating to the same MCP tool handlers
+- `schemas/`: versioned JSON schema contracts for high-value tool outputs
 - `tests/`: contract and helper tests
 
 ## Contract Stability Notes
