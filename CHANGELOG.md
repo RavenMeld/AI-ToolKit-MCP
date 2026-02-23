@@ -16,6 +16,7 @@ All notable changes to this project are documented in this file.
   - env: `MCP_HTTP_RATE_LIMIT_ENABLED=true`
   - CLI: `--rate-limit-enabled` / `--no-rate-limit`
   - tunables: `MCP_HTTP_RATE_LIMIT_WINDOW_SECONDS`, `MCP_HTTP_RATE_LIMIT_MAX_REQUESTS`
+  - proxy-aware mode: `MCP_HTTP_TRUST_PROXY_FOR_RATE_LIMIT`, `MCP_HTTP_RATE_LIMIT_CLIENT_IP_HEADER`
 - New HTTP wrapper tests for:
   - request ID echo behavior
   - malformed JSON request handling
@@ -25,6 +26,7 @@ All notable changes to this project are documented in this file.
   - `/health` default-open compatibility behavior
   - `/health` protected behavior when auth toggle is enabled
   - `RATE_LIMITED` (`429`) behavior for `POST /mcp/tool`
+  - trusted vs untrusted proxy-header behavior for rate-limit client identity
 
 ### Changed
 - HTTP wrapper now emits structured JSON errors for framework-level HTTP exceptions

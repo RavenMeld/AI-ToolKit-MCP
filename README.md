@@ -83,6 +83,8 @@ export MCP_HTTP_AUTH_FOR_TOOLS=false
 export MCP_HTTP_RATE_LIMIT_ENABLED=false
 export MCP_HTTP_RATE_LIMIT_WINDOW_SECONDS=60
 export MCP_HTTP_RATE_LIMIT_MAX_REQUESTS=120
+export MCP_HTTP_TRUST_PROXY_FOR_RATE_LIMIT=false
+export MCP_HTTP_RATE_LIMIT_CLIENT_IP_HEADER=X-Forwarded-For
 python mcp_http_server.py --host 127.0.0.1 --port 8080
 ```
 
@@ -621,6 +623,8 @@ Environment variables used by the server:
 - `MCP_HTTP_RATE_LIMIT_ENABLED` (default: `false`, enables rate limiting on `POST /mcp/tool`)
 - `MCP_HTTP_RATE_LIMIT_WINDOW_SECONDS` (default: `60`)
 - `MCP_HTTP_RATE_LIMIT_MAX_REQUESTS` (default: `120`)
+- `MCP_HTTP_TRUST_PROXY_FOR_RATE_LIMIT` (default: `false`)
+- `MCP_HTTP_RATE_LIMIT_CLIENT_IP_HEADER` (default: `X-Forwarded-For`)
 - `MCP_HTTP_TOOL_TIMEOUT_SECONDS` (default: `120`)
 - `MCP_HTTP_MAX_BODY_BYTES` (default: `1048576` / `1MB`)
 
@@ -651,6 +655,8 @@ CLI flags:
 - `--rate-limit-enabled` / `--no-rate-limit`
 - `--rate-limit-window-seconds`
 - `--rate-limit-max-requests`
+- `--trust-proxy-for-rate-limit` / `--no-trust-proxy-for-rate-limit`
+- `--rate-limit-client-ip-header`
 - `--tool-timeout-seconds`
 - `--max-body-bytes`
 
@@ -677,6 +683,9 @@ Rate limiting for `POST /mcp/tool` is optional:
 - tune with:
   - `MCP_HTTP_RATE_LIMIT_WINDOW_SECONDS` / `--rate-limit-window-seconds`
   - `MCP_HTTP_RATE_LIMIT_MAX_REQUESTS` / `--rate-limit-max-requests`
+- proxy-aware client identity (optional, disabled by default):
+  - `MCP_HTTP_TRUST_PROXY_FOR_RATE_LIMIT=true` or `--trust-proxy-for-rate-limit`
+  - header name via `MCP_HTTP_RATE_LIMIT_CLIENT_IP_HEADER` or `--rate-limit-client-ip-header`
 
 Hardening error codes:
 - `INVALID_JSON` (`400`) when request body is not valid JSON

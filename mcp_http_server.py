@@ -23,6 +23,8 @@ MAX_BODY_BYTES_KEY = web.AppKey("max_body_bytes", int)
 RATE_LIMIT_ENABLED_KEY = web.AppKey("rate_limit_enabled", bool)
 RATE_LIMIT_WINDOW_SECONDS_KEY = web.AppKey("rate_limit_window_seconds", float)
 RATE_LIMIT_MAX_REQUESTS_KEY = web.AppKey("rate_limit_max_requests", int)
+RATE_LIMIT_TRUST_PROXY_KEY = web.AppKey("rate_limit_trust_proxy", bool)
+RATE_LIMIT_CLIENT_IP_HEADER_KEY = web.AppKey("rate_limit_client_ip_header", str)
 RATE_LIMIT_STATE_KEY = web.AppKey("rate_limit_state", Dict[str, Dict[str, Any]])
 REQUEST_ID_KEY = web.AppKey("request_id", str)
 
@@ -173,7 +175,27 @@ def _normalize_tool_data(serialized_items: List[Dict[str, Any]]) -> Any:
     return {"items": parsed_items}
 
 
+def _forwarded_client_identity(request: web.Request) -> Optional[str]:
+    if not bool(request.app.get(RATE_LIMIT_TRUST_PROXY_KEY, False)):
+        return None
+
+    header_name = str(request.app.get(RATE_LIMIT_CLIENT_IP_HEADER_KEY, "X-Forwarded-For") or "X-Forwarded-For")
+    raw_value = request.headers.get(header_name, "")
+    if not raw_value:
+        return None
+
+    # Common proxy convention: first IP in comma-separated chain is original client.
+    candidate = str(raw_value).split(",")[0].strip()
+    if not candidate or "\n" in candidate or "\r" in candidate:
+        return None
+
+    return candidate[:128]
+
+
 def _client_identity(request: web.Request) -> str:
+    forwarded = _forwarded_client_identity(request)
+    if forwarded:
+        return forwarded
     return request.remote or "unknown"
 
 
@@ -418,11 +440,14 @@ def create_app(
     rate_limit_enabled: bool = False,
     rate_limit_window_seconds: float = 60.0,
     rate_limit_max_requests: int = 120,
+    trust_proxy_for_rate_limit: bool = False,
+    rate_limit_client_ip_header: str = "X-Forwarded-For",
 ) -> web.Application:
     safe_timeout = max(0.01, float(tool_timeout_seconds))
     safe_max_body = max(1, int(max_body_bytes))
     safe_rate_limit_window_seconds = max(1.0, float(rate_limit_window_seconds))
     safe_rate_limit_max_requests = max(1, int(rate_limit_max_requests))
+    safe_rate_limit_header = str(rate_limit_client_ip_header or "X-Forwarded-For").strip() or "X-Forwarded-For"
     app = web.Application(client_max_size=safe_max_body, middlewares=[_error_middleware])
     app[AUTH_TOKEN_KEY] = auth_token.strip() if isinstance(auth_token, str) and auth_token.strip() else None
     app[AUTH_FOR_HEALTH_KEY] = bool(auth_for_health)
@@ -432,6 +457,8 @@ def create_app(
     app[RATE_LIMIT_ENABLED_KEY] = bool(rate_limit_enabled)
     app[RATE_LIMIT_WINDOW_SECONDS_KEY] = safe_rate_limit_window_seconds
     app[RATE_LIMIT_MAX_REQUESTS_KEY] = safe_rate_limit_max_requests
+    app[RATE_LIMIT_TRUST_PROXY_KEY] = bool(trust_proxy_for_rate_limit)
+    app[RATE_LIMIT_CLIENT_IP_HEADER_KEY] = safe_rate_limit_header
     app[RATE_LIMIT_STATE_KEY] = {}
     app.router.add_get("/health", health_handler)
     app.router.add_get("/tools", tools_handler)
@@ -493,6 +520,29 @@ def _parse_args() -> argparse.Namespace:
         help="Disable per-client rate limiting for POST /mcp/tool.",
     )
     parser.set_defaults(rate_limit_enabled=rate_limit_enabled_default)
+    trust_proxy_for_rate_limit_default = _parse_env_bool(
+        os.getenv("MCP_HTTP_TRUST_PROXY_FOR_RATE_LIMIT"),
+        default=False,
+    )
+    trust_proxy_group = parser.add_mutually_exclusive_group()
+    trust_proxy_group.add_argument(
+        "--trust-proxy-for-rate-limit",
+        dest="trust_proxy_for_rate_limit",
+        action="store_true",
+        help="Trust forwarded client-IP header when deriving rate-limit client identity.",
+    )
+    trust_proxy_group.add_argument(
+        "--no-trust-proxy-for-rate-limit",
+        dest="trust_proxy_for_rate_limit",
+        action="store_false",
+        help="Ignore forwarded client-IP headers for rate limiting.",
+    )
+    parser.set_defaults(trust_proxy_for_rate_limit=trust_proxy_for_rate_limit_default)
+    parser.add_argument(
+        "--rate-limit-client-ip-header",
+        default=os.getenv("MCP_HTTP_RATE_LIMIT_CLIENT_IP_HEADER", "X-Forwarded-For"),
+        help="Header used for client identity when proxy trust is enabled.",
+    )
     parser.add_argument(
         "--rate-limit-window-seconds",
         type=float,
@@ -532,10 +582,12 @@ def main() -> None:
     logger.info("GET /health auth is %s", "enabled" if bool(args.auth_for_health) else "disabled")
     logger.info("GET /tools auth is %s", "enabled" if bool(args.auth_for_tools) else "disabled")
     logger.info(
-        "POST /mcp/tool rate limit is %s (window=%ss, max_requests=%s)",
+        "POST /mcp/tool rate limit is %s (window=%ss, max_requests=%s, trust_proxy=%s, header=%s)",
         "enabled" if bool(args.rate_limit_enabled) else "disabled",
         max(1.0, float(args.rate_limit_window_seconds)),
         max(1, int(args.rate_limit_max_requests)),
+        "enabled" if bool(args.trust_proxy_for_rate_limit) else "disabled",
+        str(args.rate_limit_client_ip_header or "X-Forwarded-For"),
     )
     logger.info("Tool timeout: %.2fs", max(0.01, float(args.tool_timeout_seconds)))
     logger.info("Max request body bytes: %d", max(1, int(args.max_body_bytes)))
@@ -549,6 +601,8 @@ def main() -> None:
             rate_limit_enabled=args.rate_limit_enabled,
             rate_limit_window_seconds=args.rate_limit_window_seconds,
             rate_limit_max_requests=args.rate_limit_max_requests,
+            trust_proxy_for_rate_limit=args.trust_proxy_for_rate_limit,
+            rate_limit_client_ip_header=args.rate_limit_client_ip_header,
         ),
         host=args.host,
         port=args.port,

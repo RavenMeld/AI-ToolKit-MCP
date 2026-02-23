@@ -293,5 +293,67 @@ class HttpWrapperRateLimitTests(AioHTTPTestCase):
         self.assertEqual(payload["status"], "healthy")
 
 
+class HttpWrapperRateLimitProxyTrustTests(AioHTTPTestCase):
+    async def get_application(self):
+        return create_app(
+            rate_limit_enabled=True,
+            rate_limit_window_seconds=60,
+            rate_limit_max_requests=1,
+            trust_proxy_for_rate_limit=False,
+        )
+
+    async def test_forwarded_header_ignored_when_proxy_not_trusted(self):
+        mocked_result = [types.TextContent(type="text", text='{"ok":true}')]
+        with patch("mcp_http_server.handle_call_tool", new=AsyncMock(return_value=mocked_result)) as mocked_handle:
+            first = await self.client.post(
+                "/mcp/tool",
+                json={"name": "list-configs", "arguments": {}},
+                headers={"X-Forwarded-For": "10.0.0.1"},
+            )
+            second = await self.client.post(
+                "/mcp/tool",
+                json={"name": "list-configs", "arguments": {}},
+                headers={"X-Forwarded-For": "10.0.0.2"},
+            )
+
+        self.assertEqual(first.status, 200)
+        self.assertEqual(second.status, 429)
+        self.assertEqual(mocked_handle.await_count, 1)
+
+
+class HttpWrapperRateLimitProxyTrustedTests(AioHTTPTestCase):
+    async def get_application(self):
+        return create_app(
+            rate_limit_enabled=True,
+            rate_limit_window_seconds=60,
+            rate_limit_max_requests=1,
+            trust_proxy_for_rate_limit=True,
+        )
+
+    async def test_forwarded_header_used_when_proxy_trusted(self):
+        mocked_result = [types.TextContent(type="text", text='{"ok":true}')]
+        with patch("mcp_http_server.handle_call_tool", new=AsyncMock(return_value=mocked_result)) as mocked_handle:
+            first = await self.client.post(
+                "/mcp/tool",
+                json={"name": "list-configs", "arguments": {}},
+                headers={"X-Forwarded-For": "10.0.0.1"},
+            )
+            second = await self.client.post(
+                "/mcp/tool",
+                json={"name": "list-configs", "arguments": {}},
+                headers={"X-Forwarded-For": "10.0.0.2"},
+            )
+            third = await self.client.post(
+                "/mcp/tool",
+                json={"name": "list-configs", "arguments": {}},
+                headers={"X-Forwarded-For": "10.0.0.1"},
+            )
+
+        self.assertEqual(first.status, 200)
+        self.assertEqual(second.status, 200)
+        self.assertEqual(third.status, 429)
+        self.assertEqual(mocked_handle.await_count, 2)
+
+
 if __name__ == "__main__":
     unittest.main()
