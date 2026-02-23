@@ -6,10 +6,15 @@ All notable changes to this project are documented in this file.
 
 ### Added
 - HTTP wrapper now echoes request correlation IDs via `X-Request-ID` response header.
+- Optional `/tools` auth enforcement toggle:
+  - env: `MCP_HTTP_AUTH_FOR_TOOLS=true`
+  - CLI: `--auth-for-tools` / `--no-auth-for-tools`
 - New HTTP wrapper tests for:
   - request ID echo behavior
   - malformed JSON request handling
   - unknown route structured error envelope
+  - `/tools` default-open compatibility behavior
+  - `/tools` protected behavior when auth toggle is enabled
 
 ### Changed
 - HTTP wrapper now emits structured JSON errors for framework-level HTTP exceptions

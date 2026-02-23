@@ -14,6 +14,7 @@ from mcp_server import MCP_TOOLS, handle_call_tool, handle_list_tools
 
 logger = logging.getLogger(__name__)
 AUTH_TOKEN_KEY = web.AppKey("auth_token", Optional[str])
+AUTH_FOR_TOOLS_KEY = web.AppKey("auth_for_tools", bool)
 TOOL_TIMEOUT_SECONDS_KEY = web.AppKey("tool_timeout_seconds", float)
 MAX_BODY_BYTES_KEY = web.AppKey("max_body_bytes", int)
 REQUEST_ID_KEY = web.AppKey("request_id", str)
@@ -107,6 +108,33 @@ def _require_auth(request: web.Request) -> tuple[bool, Optional[str]]:
     return True, None
 
 
+def _auth_error_response(request_id: str, auth_error: Optional[str]) -> web.Response:
+    if auth_error == "AUTH_REQUIRED":
+        return _error_response(
+            401,
+            "AUTH_REQUIRED",
+            "Authentication required. Provide Authorization: Bearer <token> or X-API-Key.",
+            request_id=request_id,
+        )
+    return _error_response(
+        403,
+        "AUTH_INVALID",
+        "Authentication token is invalid.",
+        request_id=request_id,
+    )
+
+
+def _parse_env_bool(value: Optional[str], default: bool = False) -> bool:
+    if value is None:
+        return default
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "yes", "y", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "n", "off"}:
+        return False
+    return default
+
+
 def _parse_json_text(value: str) -> Any:
     try:
         return json.loads(value)
@@ -183,6 +211,11 @@ async def health_handler(_request: web.Request) -> web.Response:
 
 async def tools_handler(_request: web.Request) -> web.Response:
     request_id = _request_id_from_request(_request)
+    if bool(_request.app.get(AUTH_FOR_TOOLS_KEY, False)):
+        authorized, auth_error = _require_auth(_request)
+        if not authorized:
+            return _auth_error_response(request_id, auth_error)
+
     tools = await handle_list_tools()
     serialized = [_serialize_tool(tool) for tool in tools]
     return web.json_response(
@@ -200,19 +233,7 @@ async def mcp_tool_handler(request: web.Request) -> web.Response:
 
     authorized, auth_error = _require_auth(request)
     if not authorized:
-        if auth_error == "AUTH_REQUIRED":
-            return _error_response(
-                401,
-                "AUTH_REQUIRED",
-                "Authentication required. Provide Authorization: Bearer <token> or X-API-Key.",
-                request_id=request_id,
-            )
-        return _error_response(
-            403,
-            "AUTH_INVALID",
-            "Authentication token is invalid.",
-            request_id=request_id,
-        )
+        return _auth_error_response(request_id, auth_error)
 
     try:
         raw_body = await request.text()
@@ -307,6 +328,7 @@ async def mcp_tool_handler(request: web.Request) -> web.Response:
 
 def create_app(
     auth_token: Optional[str] = None,
+    auth_for_tools: bool = False,
     tool_timeout_seconds: float = 120.0,
     max_body_bytes: int = 1024 * 1024,
 ) -> web.Application:
@@ -314,6 +336,7 @@ def create_app(
     safe_max_body = max(1, int(max_body_bytes))
     app = web.Application(client_max_size=safe_max_body, middlewares=[_error_middleware])
     app[AUTH_TOKEN_KEY] = auth_token.strip() if isinstance(auth_token, str) and auth_token.strip() else None
+    app[AUTH_FOR_TOOLS_KEY] = bool(auth_for_tools)
     app[TOOL_TIMEOUT_SECONDS_KEY] = safe_timeout
     app[MAX_BODY_BYTES_KEY] = safe_max_body
     app.router.add_get("/health", health_handler)
@@ -331,6 +354,21 @@ def _parse_args() -> argparse.Namespace:
         default=os.getenv("MCP_HTTP_AUTH_TOKEN"),
         help="Optional auth token accepted via Authorization: Bearer <token> or X-API-Key.",
     )
+    auth_for_tools_default = _parse_env_bool(os.getenv("MCP_HTTP_AUTH_FOR_TOOLS"), default=False)
+    auth_for_tools_group = parser.add_mutually_exclusive_group()
+    auth_for_tools_group.add_argument(
+        "--auth-for-tools",
+        dest="auth_for_tools",
+        action="store_true",
+        help="Require the auth token on GET /tools as well.",
+    )
+    auth_for_tools_group.add_argument(
+        "--no-auth-for-tools",
+        dest="auth_for_tools",
+        action="store_false",
+        help="Disable auth requirement on GET /tools.",
+    )
+    parser.set_defaults(auth_for_tools=auth_for_tools_default)
     parser.add_argument(
         "--tool-timeout-seconds",
         type=float,
@@ -355,11 +393,13 @@ def main() -> None:
     auth_enabled = bool(args.auth_token)
     logger.info("Starting HTTP wrapper on %s:%s", args.host, args.port)
     logger.info("HTTP auth is %s", "enabled" if auth_enabled else "disabled")
+    logger.info("GET /tools auth is %s", "enabled" if bool(args.auth_for_tools) else "disabled")
     logger.info("Tool timeout: %.2fs", max(0.01, float(args.tool_timeout_seconds)))
     logger.info("Max request body bytes: %d", max(1, int(args.max_body_bytes)))
     web.run_app(
         create_app(
             auth_token=args.auth_token,
+            auth_for_tools=args.auth_for_tools,
             tool_timeout_seconds=args.tool_timeout_seconds,
             max_body_bytes=args.max_body_bytes,
         ),

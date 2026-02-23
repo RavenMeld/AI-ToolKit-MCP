@@ -154,6 +154,37 @@ class HttpWrapperAuthTests(AioHTTPTestCase):
         self.assertEqual(payload["data"]["ok"], True)
 
 
+class HttpWrapperToolsEndpointAuthTests(AioHTTPTestCase):
+    async def get_application(self):
+        return create_app(auth_token="secret-token")
+
+    async def test_tools_endpoint_remains_open_by_default(self):
+        response = await self.client.get("/tools")
+        self.assertEqual(response.status, 200)
+        payload = await response.json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("tools", payload)
+
+
+class HttpWrapperToolsEndpointProtectedTests(AioHTTPTestCase):
+    async def get_application(self):
+        return create_app(auth_token="secret-token", auth_for_tools=True)
+
+    async def test_tools_endpoint_requires_auth_when_enabled(self):
+        response = await self.client.get("/tools")
+        self.assertEqual(response.status, 401)
+        payload = await response.json()
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "AUTH_REQUIRED")
+
+    async def test_tools_endpoint_accepts_api_key_when_enabled(self):
+        response = await self.client.get("/tools", headers={"X-API-Key": "secret-token"})
+        self.assertEqual(response.status, 200)
+        payload = await response.json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("tools", payload)
+
+
 class HttpWrapperHardeningTests(AioHTTPTestCase):
     async def get_application(self):
         return create_app(tool_timeout_seconds=0.01, max_body_bytes=128)

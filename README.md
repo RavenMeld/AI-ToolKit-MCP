@@ -57,11 +57,20 @@ export MCP_HTTP_AUTH_TOKEN=change-me
 python mcp_http_server.py --host 127.0.0.1 --port 8080
 ```
 
+To also require authentication on `GET /tools`:
+
+```bash
+export MCP_HTTP_AUTH_TOKEN=change-me
+export MCP_HTTP_AUTH_FOR_TOOLS=true
+python mcp_http_server.py --host 127.0.0.1 --port 8080
+```
+
 Optional hardening knobs:
 
 ```bash
 export MCP_HTTP_TOOL_TIMEOUT_SECONDS=120
 export MCP_HTTP_MAX_BODY_BYTES=1048576
+export MCP_HTTP_AUTH_FOR_TOOLS=false
 python mcp_http_server.py --host 127.0.0.1 --port 8080
 ```
 
@@ -595,6 +604,7 @@ Environment variables used by the server:
 - `LOG_LEVEL` (default: `INFO`)
 - `COMFYUI_MODEL_ROOTS` (colon-separated model roots)
 - `MCP_HTTP_AUTH_TOKEN` (optional auth token for `/mcp/tool`)
+- `MCP_HTTP_AUTH_FOR_TOOLS` (default: `false`, when `true` also protects `/tools`)
 - `MCP_HTTP_TOOL_TIMEOUT_SECONDS` (default: `120`)
 - `MCP_HTTP_MAX_BODY_BYTES` (default: `1048576` / `1MB`)
 
@@ -620,6 +630,7 @@ python mcp_http_server.py --host 127.0.0.1 --port 8080
 
 CLI flags:
 - `--auth-token`
+- `--auth-for-tools` / `--no-auth-for-tools`
 - `--tool-timeout-seconds`
 - `--max-body-bytes`
 
@@ -631,6 +642,10 @@ Endpoints:
 Auth for `POST /mcp/tool` when `MCP_HTTP_AUTH_TOKEN` is configured:
 - `Authorization: Bearer <token>`
 - or `X-API-Key: <token>`
+
+Auth for `GET /tools` is optional:
+- disabled by default for compatibility
+- enable with `MCP_HTTP_AUTH_FOR_TOOLS=true` or `--auth-for-tools`
 
 Hardening error codes:
 - `INVALID_JSON` (`400`) when request body is not valid JSON
