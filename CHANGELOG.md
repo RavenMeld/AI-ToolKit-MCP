@@ -16,6 +16,8 @@ All notable changes to this project are documented in this file.
 - Schema validation tests:
   - `tests/test_output_schema_files.py`
 - `jsonschema` dependency for schema validation.
+- Compatibility policy document:
+  - `docs/compatibility.md`
 
 ### Changed
 - Normalized HTTP tool response envelope now includes:
@@ -25,6 +27,7 @@ All notable changes to this project are documented in this file.
 - HTTP wrapper returns structured error codes for hardening failures:
   - `TOOL_TIMEOUT` (`504`)
   - `PAYLOAD_TOO_LARGE` (`413`)
+- CI now runs an explicit schema contract step before full unit tests.
 
 ## [0.1.0] - 2026-02-23
 

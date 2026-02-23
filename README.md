@@ -703,6 +703,8 @@ python -m py_compile mcp_server.py mcp_http_server.py
 - `confidence_source` and `band_source` are part of the intended automation contract.
 - `band_source.id` is versioned (`absolute_delta_thresholds_v1`) so downstream systems can detect scoring-method changes.
 - Threshold values in `band_source.thresholds` should be consumed dynamically instead of hardcoded.
+- Formal compatibility rules are documented in `docs/compatibility.md`.
+- CI includes an explicit schema contract check (`tests/test_output_schema_files.py`) before full unit tests.
 
 ## Operational Guardrails
 
