@@ -85,6 +85,7 @@ export MCP_HTTP_RATE_LIMIT_WINDOW_SECONDS=60
 export MCP_HTTP_RATE_LIMIT_MAX_REQUESTS=120
 export MCP_HTTP_TRUST_PROXY_FOR_RATE_LIMIT=false
 export MCP_HTTP_RATE_LIMIT_CLIENT_IP_HEADER=X-Forwarded-For
+export MCP_HTTP_TRUSTED_PROXY_CIDRS=127.0.0.1/32,::1/128
 python mcp_http_server.py --host 127.0.0.1 --port 8080
 ```
 
@@ -625,6 +626,7 @@ Environment variables used by the server:
 - `MCP_HTTP_RATE_LIMIT_MAX_REQUESTS` (default: `120`)
 - `MCP_HTTP_TRUST_PROXY_FOR_RATE_LIMIT` (default: `false`)
 - `MCP_HTTP_RATE_LIMIT_CLIENT_IP_HEADER` (default: `X-Forwarded-For`)
+- `MCP_HTTP_TRUSTED_PROXY_CIDRS` (default: empty, comma-separated CIDRs for trusted proxy source addresses)
 - `MCP_HTTP_TOOL_TIMEOUT_SECONDS` (default: `120`)
 - `MCP_HTTP_MAX_BODY_BYTES` (default: `1048576` / `1MB`)
 
@@ -657,6 +659,7 @@ CLI flags:
 - `--rate-limit-max-requests`
 - `--trust-proxy-for-rate-limit` / `--no-trust-proxy-for-rate-limit`
 - `--rate-limit-client-ip-header`
+- `--trusted-proxy-cidrs`
 - `--tool-timeout-seconds`
 - `--max-body-bytes`
 
@@ -686,6 +689,8 @@ Rate limiting for `POST /mcp/tool` is optional:
 - proxy-aware client identity (optional, disabled by default):
   - `MCP_HTTP_TRUST_PROXY_FOR_RATE_LIMIT=true` or `--trust-proxy-for-rate-limit`
   - header name via `MCP_HTTP_RATE_LIMIT_CLIENT_IP_HEADER` or `--rate-limit-client-ip-header`
+  - optional source allowlist via `MCP_HTTP_TRUSTED_PROXY_CIDRS` or `--trusted-proxy-cidrs`
+    - when configured, forwarded headers are ignored unless the direct remote address is in the allowlist
 
 Hardening error codes:
 - `INVALID_JSON` (`400`) when request body is not valid JSON

@@ -2,6 +2,7 @@
 import argparse
 import asyncio
 import hmac
+import ipaddress
 import json
 import logging
 import math
@@ -25,6 +26,8 @@ RATE_LIMIT_WINDOW_SECONDS_KEY = web.AppKey("rate_limit_window_seconds", float)
 RATE_LIMIT_MAX_REQUESTS_KEY = web.AppKey("rate_limit_max_requests", int)
 RATE_LIMIT_TRUST_PROXY_KEY = web.AppKey("rate_limit_trust_proxy", bool)
 RATE_LIMIT_CLIENT_IP_HEADER_KEY = web.AppKey("rate_limit_client_ip_header", str)
+RATE_LIMIT_TRUSTED_PROXY_CIDRS_KEY = web.AppKey("rate_limit_trusted_proxy_cidrs", List[str])
+RATE_LIMIT_TRUSTED_PROXY_NETWORKS_KEY = web.AppKey("rate_limit_trusted_proxy_networks", List[Any])
 RATE_LIMIT_STATE_KEY = web.AppKey("rate_limit_state", Dict[str, Dict[str, Any]])
 REQUEST_ID_KEY = web.AppKey("request_id", str)
 
@@ -145,6 +148,86 @@ def _parse_env_bool(value: Optional[str], default: bool = False) -> bool:
     return default
 
 
+def _normalize_rate_limit_trusted_proxy_cidrs(value: Any) -> List[str]:
+    if value is None:
+        return []
+
+    raw_items: List[str] = []
+    if isinstance(value, str):
+        raw_items = value.split(",")
+    elif isinstance(value, (list, tuple, set)):
+        for item in value:
+            if item is None:
+                continue
+            raw_items.extend(str(item).split(","))
+    else:
+        raw_items = [str(value)]
+
+    normalized: List[str] = []
+    for item in raw_items:
+        cidr = str(item).strip()
+        if cidr:
+            normalized.append(cidr)
+    return normalized
+
+
+def _parse_trusted_proxy_networks(cidr_values: List[str]) -> List[Any]:
+    networks: List[Any] = []
+    for cidr in cidr_values:
+        try:
+            network = ipaddress.ip_network(cidr, strict=False)
+        except ValueError as exc:
+            raise ValueError(f"Invalid trusted proxy CIDR: {cidr}") from exc
+        networks.append(network)
+    return networks
+
+
+def _parse_ip_literal(value: Optional[str]) -> Optional[Any]:
+    if not value:
+        return None
+
+    candidate = str(value).strip()
+    if not candidate:
+        return None
+
+    if candidate.startswith("[") and "]" in candidate:
+        candidate = candidate[1 : candidate.index("]")]
+
+    if "%" in candidate:
+        candidate = candidate.split("%", 1)[0]
+
+    try:
+        return ipaddress.ip_address(candidate)
+    except ValueError:
+        pass
+
+    # Best-effort fallback for "<ipv4>:<port>" shapes.
+    if candidate.count(":") == 1:
+        host, port = candidate.rsplit(":", 1)
+        if port.isdigit():
+            try:
+                return ipaddress.ip_address(host)
+            except ValueError:
+                return None
+
+    return None
+
+
+def _request_from_trusted_proxy(request: web.Request) -> bool:
+    trusted_networks = request.app.get(RATE_LIMIT_TRUSTED_PROXY_NETWORKS_KEY, [])
+    if not trusted_networks:
+        return True
+
+    remote_address = _parse_ip_literal(request.remote)
+    if remote_address is None:
+        return False
+
+    for network in trusted_networks:
+        if remote_address in network:
+            return True
+    return False
+
+
 def _parse_json_text(value: str) -> Any:
     try:
         return json.loads(value)
@@ -177,6 +260,9 @@ def _normalize_tool_data(serialized_items: List[Dict[str, Any]]) -> Any:
 
 def _forwarded_client_identity(request: web.Request) -> Optional[str]:
     if not bool(request.app.get(RATE_LIMIT_TRUST_PROXY_KEY, False)):
+        return None
+
+    if not _request_from_trusted_proxy(request):
         return None
 
     header_name = str(request.app.get(RATE_LIMIT_CLIENT_IP_HEADER_KEY, "X-Forwarded-For") or "X-Forwarded-For")
@@ -442,12 +528,15 @@ def create_app(
     rate_limit_max_requests: int = 120,
     trust_proxy_for_rate_limit: bool = False,
     rate_limit_client_ip_header: str = "X-Forwarded-For",
+    rate_limit_trusted_proxy_cidrs: str | List[str] | None = None,
 ) -> web.Application:
     safe_timeout = max(0.01, float(tool_timeout_seconds))
     safe_max_body = max(1, int(max_body_bytes))
     safe_rate_limit_window_seconds = max(1.0, float(rate_limit_window_seconds))
     safe_rate_limit_max_requests = max(1, int(rate_limit_max_requests))
     safe_rate_limit_header = str(rate_limit_client_ip_header or "X-Forwarded-For").strip() or "X-Forwarded-For"
+    safe_rate_limit_trusted_proxy_cidrs = _normalize_rate_limit_trusted_proxy_cidrs(rate_limit_trusted_proxy_cidrs)
+    safe_rate_limit_trusted_proxy_networks = _parse_trusted_proxy_networks(safe_rate_limit_trusted_proxy_cidrs)
     app = web.Application(client_max_size=safe_max_body, middlewares=[_error_middleware])
     app[AUTH_TOKEN_KEY] = auth_token.strip() if isinstance(auth_token, str) and auth_token.strip() else None
     app[AUTH_FOR_HEALTH_KEY] = bool(auth_for_health)
@@ -459,6 +548,8 @@ def create_app(
     app[RATE_LIMIT_MAX_REQUESTS_KEY] = safe_rate_limit_max_requests
     app[RATE_LIMIT_TRUST_PROXY_KEY] = bool(trust_proxy_for_rate_limit)
     app[RATE_LIMIT_CLIENT_IP_HEADER_KEY] = safe_rate_limit_header
+    app[RATE_LIMIT_TRUSTED_PROXY_CIDRS_KEY] = safe_rate_limit_trusted_proxy_cidrs
+    app[RATE_LIMIT_TRUSTED_PROXY_NETWORKS_KEY] = safe_rate_limit_trusted_proxy_networks
     app[RATE_LIMIT_STATE_KEY] = {}
     app.router.add_get("/health", health_handler)
     app.router.add_get("/tools", tools_handler)
@@ -544,6 +635,11 @@ def _parse_args() -> argparse.Namespace:
         help="Header used for client identity when proxy trust is enabled.",
     )
     parser.add_argument(
+        "--trusted-proxy-cidrs",
+        default=os.getenv("MCP_HTTP_TRUSTED_PROXY_CIDRS", ""),
+        help="Comma-separated CIDR allowlist for direct proxy source addresses when trust-proxy mode is enabled.",
+    )
+    parser.add_argument(
         "--rate-limit-window-seconds",
         type=float,
         default=float(os.getenv("MCP_HTTP_RATE_LIMIT_WINDOW_SECONDS", "60")),
@@ -567,7 +663,14 @@ def _parse_args() -> argparse.Namespace:
         default=int(os.getenv("MCP_HTTP_MAX_BODY_BYTES", str(1024 * 1024))),
         help="Maximum accepted HTTP request body size in bytes.",
     )
-    return parser.parse_args()
+    parsed_args = parser.parse_args()
+    try:
+        _parse_trusted_proxy_networks(
+            _normalize_rate_limit_trusted_proxy_cidrs(getattr(parsed_args, "trusted_proxy_cidrs", ""))
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
+    return parsed_args
 
 
 def main() -> None:
@@ -589,6 +692,10 @@ def main() -> None:
         "enabled" if bool(args.trust_proxy_for_rate_limit) else "disabled",
         str(args.rate_limit_client_ip_header or "X-Forwarded-For"),
     )
+    logger.info(
+        "Trusted proxy CIDR allowlist for rate-limit header trust: %s",
+        str(args.trusted_proxy_cidrs).strip() or "(any source)",
+    )
     logger.info("Tool timeout: %.2fs", max(0.01, float(args.tool_timeout_seconds)))
     logger.info("Max request body bytes: %d", max(1, int(args.max_body_bytes)))
     web.run_app(
@@ -603,6 +710,7 @@ def main() -> None:
             rate_limit_max_requests=args.rate_limit_max_requests,
             trust_proxy_for_rate_limit=args.trust_proxy_for_rate_limit,
             rate_limit_client_ip_header=args.rate_limit_client_ip_header,
+            rate_limit_trusted_proxy_cidrs=args.trusted_proxy_cidrs,
         ),
         host=args.host,
         port=args.port,

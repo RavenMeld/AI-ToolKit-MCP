@@ -355,5 +355,75 @@ class HttpWrapperRateLimitProxyTrustedTests(AioHTTPTestCase):
         self.assertEqual(mocked_handle.await_count, 2)
 
 
+class HttpWrapperRateLimitProxyAllowlistUntrustedSourceTests(AioHTTPTestCase):
+    async def get_application(self):
+        return create_app(
+            rate_limit_enabled=True,
+            rate_limit_window_seconds=60,
+            rate_limit_max_requests=1,
+            trust_proxy_for_rate_limit=True,
+            rate_limit_trusted_proxy_cidrs="10.0.0.0/8",
+        )
+
+    async def test_forwarded_header_ignored_when_proxy_source_not_allowlisted(self):
+        mocked_result = [types.TextContent(type="text", text='{"ok":true}')]
+        with patch("mcp_http_server.handle_call_tool", new=AsyncMock(return_value=mocked_result)) as mocked_handle:
+            first = await self.client.post(
+                "/mcp/tool",
+                json={"name": "list-configs", "arguments": {}},
+                headers={"X-Forwarded-For": "10.0.0.1"},
+            )
+            second = await self.client.post(
+                "/mcp/tool",
+                json={"name": "list-configs", "arguments": {}},
+                headers={"X-Forwarded-For": "10.0.0.2"},
+            )
+
+        self.assertEqual(first.status, 200)
+        self.assertEqual(second.status, 429)
+        self.assertEqual(mocked_handle.await_count, 1)
+
+
+class HttpWrapperRateLimitProxyAllowlistTrustedSourceTests(AioHTTPTestCase):
+    async def get_application(self):
+        return create_app(
+            rate_limit_enabled=True,
+            rate_limit_window_seconds=60,
+            rate_limit_max_requests=1,
+            trust_proxy_for_rate_limit=True,
+            rate_limit_trusted_proxy_cidrs="127.0.0.0/8,::1/128",
+        )
+
+    async def test_forwarded_header_used_when_proxy_source_allowlisted(self):
+        mocked_result = [types.TextContent(type="text", text='{"ok":true}')]
+        with patch("mcp_http_server.handle_call_tool", new=AsyncMock(return_value=mocked_result)) as mocked_handle:
+            first = await self.client.post(
+                "/mcp/tool",
+                json={"name": "list-configs", "arguments": {}},
+                headers={"X-Forwarded-For": "10.0.0.1"},
+            )
+            second = await self.client.post(
+                "/mcp/tool",
+                json={"name": "list-configs", "arguments": {}},
+                headers={"X-Forwarded-For": "10.0.0.2"},
+            )
+            third = await self.client.post(
+                "/mcp/tool",
+                json={"name": "list-configs", "arguments": {}},
+                headers={"X-Forwarded-For": "10.0.0.1"},
+            )
+
+        self.assertEqual(first.status, 200)
+        self.assertEqual(second.status, 200)
+        self.assertEqual(third.status, 429)
+        self.assertEqual(mocked_handle.await_count, 2)
+
+
+class HttpWrapperRateLimitConfigValidationTests(unittest.TestCase):
+    def test_invalid_trusted_proxy_cidr_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Invalid trusted proxy CIDR"):
+            create_app(rate_limit_trusted_proxy_cidrs="not-a-cidr")
+
+
 if __name__ == "__main__":
     unittest.main()
