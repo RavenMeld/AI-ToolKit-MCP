@@ -100,6 +100,265 @@ Typical arguments:
 }
 ```
 
+## Top 8 Tool Request/Response Examples
+
+All requests below are JSON bodies suitable for `POST /mcp/tool`:
+- `{"name":"<tool-name>","arguments":{...}}`
+
+### 1) `get-training-observability`
+
+Request:
+
+```json
+{
+  "name": "get-training-observability",
+  "arguments": {
+    "job_id": "job_12345",
+    "lines": 1200,
+    "include_dataset": true,
+    "include_nlp": true,
+    "include_evaluation": true,
+    "include_next_experiment": true,
+    "include_baseline_comparison": true,
+    "baseline_limit": 5
+  }
+}
+```
+
+Response excerpt:
+
+```json
+{
+  "ok": true,
+  "tool": "get-training-observability",
+  "result": [
+    {
+      "type": "text",
+      "text": "{\n  \"analysis_mode\": \"deep_log_intelligence\",\n  \"overall_health\": \"warning\",\n  \"intelligence\": {\"scores\": {\"overall\": 74.8}}\n}"
+    }
+  ]
+}
+```
+
+### 2) `compare-training-runs`
+
+Request:
+
+```json
+{
+  "name": "compare-training-runs",
+  "arguments": {
+    "job_ids": ["job_a", "job_b", "job_c"],
+    "include_dataset": true,
+    "include_nlp": true
+  }
+}
+```
+
+Response excerpt:
+
+```json
+{
+  "ok": true,
+  "tool": "compare-training-runs",
+  "result": [
+    {
+      "type": "text",
+      "text": "{\n  \"compared_count\": 3,\n  \"ranking\": {\"winner_job_id\": \"job_b\"}\n}"
+    }
+  ]
+}
+```
+
+### 3) `run-training-with-guardrails`
+
+Request:
+
+```json
+{
+  "name": "run-training-with-guardrails",
+  "arguments": {
+    "config_name": "my_lora_config",
+    "monitor_seconds": 120,
+    "stop_on_nan": true,
+    "stop_on_repeated_oom": true,
+    "stop_on_stalled_progress": true
+  }
+}
+```
+
+Response excerpt:
+
+```json
+{
+  "ok": true,
+  "tool": "run-training-with-guardrails",
+  "result": [
+    {
+      "type": "text",
+      "text": "{\n  \"started\": true,\n  \"status\": \"monitor_window_complete\",\n  \"job_id\": \"job_12345\"\n}"
+    }
+  ]
+}
+```
+
+### 4) `evaluate-lora`
+
+Request:
+
+```json
+{
+  "name": "evaluate-lora",
+  "arguments": {
+    "job_id": "job_12345",
+    "include_dataset": true,
+    "include_nlp": true,
+    "pass_threshold": 70
+  }
+}
+```
+
+Response excerpt:
+
+```json
+{
+  "ok": true,
+  "tool": "evaluate-lora",
+  "result": [
+    {
+      "type": "text",
+      "text": "{\n  \"overall_score\": 78.6,\n  \"grade\": \"B\",\n  \"passed\": true\n}"
+    }
+  ]
+}
+```
+
+### 5) `suggest-next-experiment`
+
+Request:
+
+```json
+{
+  "name": "suggest-next-experiment",
+  "arguments": {
+    "job_id": "job_12345",
+    "include_dataset": true,
+    "include_nlp": true
+  }
+}
+```
+
+Response excerpt:
+
+```json
+{
+  "ok": true,
+  "tool": "suggest-next-experiment",
+  "result": [
+    {
+      "type": "text",
+      "text": "{\n  \"recommendation_type\": \"tune_learning_rate\",\n  \"proposed\": 0.00015,\n  \"risk_level\": \"low\"\n}"
+    }
+  ]
+}
+```
+
+### 6) `auto-improve-dataset`
+
+Request:
+
+```json
+{
+  "name": "auto-improve-dataset",
+  "arguments": {
+    "dataset_path": "/ai-toolkit/datasets/my_dataset",
+    "apply": false,
+    "fill_missing_captions": true,
+    "quarantine_corrupt": true
+  }
+}
+```
+
+Response excerpt:
+
+```json
+{
+  "ok": true,
+  "tool": "auto-improve-dataset",
+  "result": [
+    {
+      "type": "text",
+      "text": "{\n  \"dataset_path\": \"/ai-toolkit/datasets/my_dataset\",\n  \"plan\": {\"missing_captions\": 18, \"corrupt_images\": 2}\n}"
+    }
+  ]
+}
+```
+
+### 7) `export-observability-report`
+
+Request:
+
+```json
+{
+  "name": "export-observability-report",
+  "arguments": {
+    "job_id": "job_12345",
+    "output_dir": "/ai-toolkit/outputs/reports",
+    "filename_prefix": "job_12345_obsv",
+    "include_dataset": true,
+    "include_nlp": true,
+    "include_evaluation": true
+  }
+}
+```
+
+Response excerpt:
+
+```json
+{
+  "ok": true,
+  "tool": "export-observability-report",
+  "result": [
+    {
+      "type": "text",
+      "text": "{\n  \"success\": true,\n  \"json_path\": \"/ai-toolkit/outputs/reports/job_12345_obsv.json\",\n  \"markdown_path\": \"/ai-toolkit/outputs/reports/job_12345_obsv.md\"\n}"
+    }
+  ]
+}
+```
+
+### 8) `alert-routing`
+
+Request:
+
+```json
+{
+  "name": "alert-routing",
+  "arguments": {
+    "job_id": "job_12345",
+    "sink": "file",
+    "destination": "/ai-toolkit/outputs/alerts/job_12345-alerts.jsonl",
+    "min_severity": "warning",
+    "include_context": true
+  }
+}
+```
+
+Response excerpt:
+
+```json
+{
+  "ok": true,
+  "tool": "alert-routing",
+  "result": [
+    {
+      "type": "text",
+      "text": "{\n  \"routed_count\": 3,\n  \"suppressed_count\": 1,\n  \"destination\": \"/ai-toolkit/outputs/alerts/job_12345-alerts.jsonl\"\n}"
+    }
+  ]
+}
+```
+
 ## Tool Surface
 
 The server currently exposes these tools:
@@ -187,6 +446,105 @@ Returns rank ordering plus explainability deltas against the winner.
     }
   }
 }
+```
+
+### Output Schema Excerpts
+
+`intelligence`:
+
+```json
+{
+  "scores": {
+    "overall": 0.0,
+    "convergence": 0.0,
+    "stability": 0.0,
+    "speed": 0.0,
+    "dataset": 0.0
+  },
+  "bottlenecks": [
+    {
+      "code": "THROUGHPUT_LOW",
+      "severity": "warning",
+      "message": "Observed throughput is below the adaptive healthy range for this run profile.",
+      "confidence": 0.76,
+      "confidence_source": "alert_category_max"
+    }
+  ],
+  "recommendations": [
+    {
+      "title": "Reduce learning rate and rerun 300 steps",
+      "priority": "high"
+    }
+  ],
+  "decision_gates": {
+    "ready_for_release": false
+  },
+  "thresholds": {
+    "pass_threshold": 70.0
+  },
+  "context": {
+    "run_class": "standard",
+    "speed_curve_thresholds": {
+      "excellent": 0.35,
+      "good": 0.2,
+      "fair": 0.1,
+      "watch": 0.05,
+      "poor": 0.02
+    }
+  },
+  "confidence": {
+    "overall": 0.0
+  }
+}
+```
+
+`delta_to_winner`:
+
+```json
+{
+  "total": -6.4,
+  "total_band": "moderate",
+  "components": {
+    "convergence": -8.0,
+    "speed": -3.5,
+    "stability": -4.2,
+    "dataset": -1.0
+  },
+  "component_bands": {
+    "convergence": "moderate",
+    "speed": "moderate",
+    "stability": "moderate",
+    "dataset": "negligible"
+  },
+  "band_source": {
+    "id": "absolute_delta_thresholds_v1",
+    "units": "score_points",
+    "thresholds": {
+      "negligible_lte": 2.0,
+      "moderate_lte": 8.0,
+      "large_gt": 8.0
+    }
+  }
+}
+```
+
+`alerts`:
+
+```json
+[
+  {
+    "severity": "warning",
+    "category": "speed",
+    "message": "Training throughput is low.",
+    "confidence": 0.76
+  },
+  {
+    "severity": "critical",
+    "category": "errors",
+    "message": "Critical error pattern detected in logs.",
+    "confidence": 0.95
+  }
+]
 ```
 
 ## Runtime Prerequisites

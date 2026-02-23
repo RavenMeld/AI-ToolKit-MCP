@@ -197,9 +197,9 @@ Plan and deliver all seven improvements for `RavenMeld/AI-ToolKit-MCP`:
 - [x] Phase 0 baseline capture
 - [x] Phase 1 dependencies
 - [x] Phase 2 HTTP wrapper
-- [ ] Phase 3 docs/examples/schemas
-- [ ] Phase 4 smoke test
-- [ ] Phase 5 CI
+- [x] Phase 3 docs/examples/schemas
+- [x] Phase 4 smoke test
+- [x] Phase 5 CI
 - [ ] Phase 6 release tag
 
 ## Phase 0 Results
@@ -237,3 +237,36 @@ Plan and deliver all seven improvements for `RavenMeld/AI-ToolKit-MCP`:
   - `python -m py_compile mcp_server.py mcp_http_server.py` -> pass
   - `python -m unittest discover -s tests -p 'test_*.py'` -> `Ran 10 tests ... OK`
 - Result: HTTP wrapper is implemented, documented, and covered by tests.
+
+## Phase 3 Results
+- Expanded README with integration-ready API examples:
+  - Added `Top 8 Tool Request/Response Examples` section
+  - Covered: `get-training-observability`, `compare-training-runs`, `run-training-with-guardrails`, `evaluate-lora`, `suggest-next-experiment`, `auto-improve-dataset`, `export-observability-report`, `alert-routing`
+- Added explicit schema excerpts for:
+  - `intelligence`
+  - `delta_to_winner`
+  - `alerts`
+- Preserved provenance/stability guidance (`confidence_source`, `band_source`) and aligned examples with current contracts.
+- Result: documentation now supports direct tool integration and contract understanding.
+
+## Phase 4 Results
+- Added dedicated integration smoke test module:
+  - `tests/test_get_training_observability_smoke.py`
+- Test design:
+  - Mocks backend client (`AIToolkitClient`) methods (`get_training_status`, `get_training_job`, `get_training_logs`, `get_system_stats`)
+  - Executes full `handle_call_tool("get-training-observability", ...)` path
+  - Asserts required top-level sections and provenance fields (`confidence_source`, `delta_to_winner.band_source.id`)
+- Validation:
+  - Included in full unit test run (`python -m unittest discover -s tests -p 'test_*.py'`)
+- Result: end-to-end contract path for observability is now protected by a deterministic smoke test.
+
+## Phase 5 Results
+- Added CI workflow:
+  - `.github/workflows/ci.yml`
+  - Runs on `push` to `main` and all pull requests
+  - Python matrix: `3.10`, `3.11`
+  - Steps: install pinned dependencies, run `py_compile`, run unit tests
+- Local CI-equivalent validation:
+  - `python -m py_compile mcp_server.py mcp_http_server.py` -> pass
+  - `python -m unittest discover -s tests -p 'test_*.py'` -> `Ran 11 tests ... OK`
+- Result: repository now has an enforceable quality gate for syntax and tests.
