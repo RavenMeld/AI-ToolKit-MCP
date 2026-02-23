@@ -72,7 +72,9 @@ def _request_id_from_request(request: web.Request) -> str:
         return existing
     candidate = request.headers.get("X-Request-ID")
     if candidate and candidate.strip():
-        return candidate.strip()
+        cleaned = candidate.strip()
+        if "\n" not in cleaned and "\r" not in cleaned:
+            return cleaned[:128]
     return str(uuid.uuid4())
 
 
@@ -143,16 +145,26 @@ async def _error_middleware(
     request_id = _request_id_from_request(request)
     request[REQUEST_ID_KEY] = request_id
     try:
-        return await handler(request)
+        response = await handler(request)
     except web.HTTPRequestEntityTooLarge:
         max_body_bytes = int(request.app.get(MAX_BODY_BYTES_KEY, 0))
-        return _error_response(
+        response = _error_response(
             413,
             "PAYLOAD_TOO_LARGE",
             "Request body exceeds configured size limit.",
             request_id=request_id,
             details={"max_body_bytes": max_body_bytes},
         )
+    except web.HTTPException as exc:
+        response = _error_response(
+            int(getattr(exc, "status", 500)),
+            f"HTTP_{int(getattr(exc, 'status', 500))}",
+            getattr(exc, "reason", None) or "HTTP request failed.",
+            request_id=request_id,
+        )
+
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 async def health_handler(_request: web.Request) -> web.Response:
@@ -203,8 +215,9 @@ async def mcp_tool_handler(request: web.Request) -> web.Response:
         )
 
     try:
-        body = await request.json()
-    except json.JSONDecodeError:
+        raw_body = await request.text()
+        body = json.loads(raw_body)
+    except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
         return _error_response(
             400,
             "INVALID_JSON",

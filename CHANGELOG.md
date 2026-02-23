@@ -4,7 +4,18 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
-No changes yet.
+### Added
+- HTTP wrapper now echoes request correlation IDs via `X-Request-ID` response header.
+- New HTTP wrapper tests for:
+  - request ID echo behavior
+  - malformed JSON request handling
+  - unknown route structured error envelope
+
+### Changed
+- HTTP wrapper now emits structured JSON errors for framework-level HTTP exceptions
+  (for example `HTTP_404`) instead of default plain-text responses.
+- JSON request parsing in `POST /mcp/tool` is now deterministic across content-type edge
+  cases and consistently returns `INVALID_JSON` (`400`) for malformed payloads.
 
 ## [0.1.1] - 2026-02-23
 

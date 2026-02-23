@@ -74,6 +74,42 @@ class HttpWrapperBasicTests(AioHTTPTestCase):
         self.assertEqual(payload["error"]["code"], "TOOL_NOT_FOUND")
         self.assertIn("request_id", payload)
 
+    async def test_request_id_header_is_echoed(self):
+        mocked_result = [types.TextContent(type="text", text='{"ok":true}')]
+        with patch("mcp_http_server.handle_call_tool", new=AsyncMock(return_value=mocked_result)):
+            response = await self.client.post(
+                "/mcp/tool",
+                json={"name": "list-configs", "arguments": {}},
+                headers={"X-Request-ID": "req-123"},
+            )
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.headers.get("X-Request-ID"), "req-123")
+        payload = await response.json()
+        self.assertEqual(payload["request_id"], "req-123")
+
+    async def test_invalid_json_returns_structured_error(self):
+        response = await self.client.post(
+            "/mcp/tool",
+            data='{"name": "list-configs",',
+            headers={"Content-Type": "application/json", "X-Request-ID": "req-bad-json"},
+        )
+        self.assertEqual(response.status, 400)
+        self.assertEqual(response.headers.get("X-Request-ID"), "req-bad-json")
+        payload = await response.json()
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["request_id"], "req-bad-json")
+        self.assertEqual(payload["error"]["code"], "INVALID_JSON")
+
+    async def test_unknown_route_returns_json_error(self):
+        response = await self.client.get("/does-not-exist", headers={"X-Request-ID": "req-404"})
+        self.assertEqual(response.status, 404)
+        self.assertEqual(response.headers.get("X-Request-ID"), "req-404")
+        payload = await response.json()
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["request_id"], "req-404")
+        self.assertEqual(payload["error"]["code"], "HTTP_404")
+
 
 class HttpWrapperAuthTests(AioHTTPTestCase):
     async def get_application(self):

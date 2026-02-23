@@ -633,8 +633,14 @@ Auth for `POST /mcp/tool` when `MCP_HTTP_AUTH_TOKEN` is configured:
 - or `X-API-Key: <token>`
 
 Hardening error codes:
+- `INVALID_JSON` (`400`) when request body is not valid JSON
 - `TOOL_TIMEOUT` (`504`) when execution exceeds `MCP_HTTP_TOOL_TIMEOUT_SECONDS`
 - `PAYLOAD_TOO_LARGE` (`413`) when body exceeds `MCP_HTTP_MAX_BODY_BYTES`
+- `HTTP_<status>` for framework-level HTTP errors (for example `HTTP_404`)
+
+Request correlation:
+- Send `X-Request-ID` in request headers to preserve your own request ID.
+- Responses include the same `X-Request-ID` header and `request_id` JSON field.
 
 Normalized response envelope:
 
