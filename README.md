@@ -13,6 +13,86 @@ This repository is intentionally focused:
 - Dataset diagnostics and safe auto-improvement actions.
 - Compare-run explainability with explicit provenance metadata.
 
+## Quick Start (5 Minutes)
+
+1. Install runtime dependencies:
+
+```bash
+python -m pip install mcp aiohttp websockets pydantic pyyaml Pillow
+```
+
+2. Point the MCP server at your AI Toolkit backend:
+
+```bash
+export AI_TOOLKIT_SERVER_URL=http://localhost:8675
+export LOG_LEVEL=INFO
+```
+
+3. Start the MCP server:
+
+```bash
+python mcp_server.py
+```
+
+4. Register this command in your MCP client and call `get-training-observability` with a `job_id`.
+
+## Architecture At A Glance
+
+1. MCP client calls a tool exposed by `mcp_server.py`.
+2. The server queries AI Toolkit backend APIs for jobs, logs, metrics, and artifacts.
+3. Helper layers score/aggregate speed, quality, errors, dataset, and NLP signals.
+4. The server returns structured JSON contracts designed for automation, including confidence provenance fields.
+
+## Most Used Workflows
+
+### Validate -> Plan -> Guardrailed Run
+
+Use these tools in order:
+- `validate-training-config`
+- `recommend-training-plan`
+- `run-training-with-guardrails`
+
+### One-Call Deep Diagnosis
+
+Use:
+- `get-training-observability`
+
+Typical arguments:
+
+```json
+{
+  "tool": "get-training-observability",
+  "arguments": {
+    "job_id": "job_12345",
+    "lines": 1200,
+    "include_dataset": true,
+    "include_nlp": true,
+    "include_evaluation": true,
+    "include_next_experiment": true,
+    "include_baseline_comparison": true,
+    "baseline_limit": 5
+  }
+}
+```
+
+### Compare Multiple Runs
+
+Use:
+- `compare-training-runs`
+
+Typical arguments:
+
+```json
+{
+  "tool": "compare-training-runs",
+  "arguments": {
+    "job_ids": ["job_a", "job_b", "job_c"],
+    "include_dataset": true,
+    "include_nlp": true
+  }
+}
+```
+
 ## Tool Surface
 
 The server currently exposes these tools:
@@ -181,6 +261,19 @@ python -m py_compile mcp_server.py
 
 - `mcp_server.py`: MCP server, tool schemas, tool handlers, intelligence/scoring helpers
 - `tests/`: contract and helper tests
+
+## Contract Stability Notes
+
+- `confidence_source` and `band_source` are part of the intended automation contract.
+- `band_source.id` is versioned (`absolute_delta_thresholds_v1`) so downstream systems can detect scoring-method changes.
+- Threshold values in `band_source.thresholds` should be consumed dynamically instead of hardcoded.
+
+## Operational Guardrails
+
+- Run through `run-training-with-guardrails` for long jobs instead of raw `start-training`.
+- Prefer `include_baseline_comparison=true` for release/selection decisions.
+- Route critical conditions using `alert-routing` to file or webhook sinks.
+- Keep `AI_TOOLKIT_SERVER_URL` on trusted internal networks only.
 
 ## Troubleshooting
 
