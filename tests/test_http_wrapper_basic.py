@@ -424,6 +424,14 @@ class HttpWrapperRateLimitConfigValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Invalid trusted proxy CIDR"):
             create_app(rate_limit_trusted_proxy_cidrs="not-a-cidr")
 
+    def test_missing_trusted_proxy_cidrs_rejected_in_strict_mode(self):
+        with self.assertRaisesRegex(ValueError, "Trusted proxy CIDR allowlist is required"):
+            create_app(
+                trust_proxy_for_rate_limit=True,
+                require_trusted_proxy_cidrs=True,
+                rate_limit_trusted_proxy_cidrs="",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

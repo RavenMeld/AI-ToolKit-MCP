@@ -28,6 +28,7 @@ RATE_LIMIT_TRUST_PROXY_KEY = web.AppKey("rate_limit_trust_proxy", bool)
 RATE_LIMIT_CLIENT_IP_HEADER_KEY = web.AppKey("rate_limit_client_ip_header", str)
 RATE_LIMIT_TRUSTED_PROXY_CIDRS_KEY = web.AppKey("rate_limit_trusted_proxy_cidrs", List[str])
 RATE_LIMIT_TRUSTED_PROXY_NETWORKS_KEY = web.AppKey("rate_limit_trusted_proxy_networks", List[Any])
+RATE_LIMIT_REQUIRE_TRUSTED_PROXY_CIDRS_KEY = web.AppKey("rate_limit_require_trusted_proxy_cidrs", bool)
 RATE_LIMIT_STATE_KEY = web.AppKey("rate_limit_state", Dict[str, Dict[str, Any]])
 REQUEST_ID_KEY = web.AppKey("request_id", str)
 
@@ -260,6 +261,11 @@ def _normalize_tool_data(serialized_items: List[Dict[str, Any]]) -> Any:
 
 def _forwarded_client_identity(request: web.Request) -> Optional[str]:
     if not bool(request.app.get(RATE_LIMIT_TRUST_PROXY_KEY, False)):
+        return None
+
+    if bool(request.app.get(RATE_LIMIT_REQUIRE_TRUSTED_PROXY_CIDRS_KEY, False)) and not request.app.get(
+        RATE_LIMIT_TRUSTED_PROXY_NETWORKS_KEY, []
+    ):
         return None
 
     if not _request_from_trusted_proxy(request):
@@ -529,6 +535,7 @@ def create_app(
     trust_proxy_for_rate_limit: bool = False,
     rate_limit_client_ip_header: str = "X-Forwarded-For",
     rate_limit_trusted_proxy_cidrs: str | List[str] | None = None,
+    require_trusted_proxy_cidrs: bool = False,
 ) -> web.Application:
     safe_timeout = max(0.01, float(tool_timeout_seconds))
     safe_max_body = max(1, int(max_body_bytes))
@@ -537,6 +544,11 @@ def create_app(
     safe_rate_limit_header = str(rate_limit_client_ip_header or "X-Forwarded-For").strip() or "X-Forwarded-For"
     safe_rate_limit_trusted_proxy_cidrs = _normalize_rate_limit_trusted_proxy_cidrs(rate_limit_trusted_proxy_cidrs)
     safe_rate_limit_trusted_proxy_networks = _parse_trusted_proxy_networks(safe_rate_limit_trusted_proxy_cidrs)
+    safe_require_trusted_proxy_cidrs = bool(require_trusted_proxy_cidrs)
+    if safe_require_trusted_proxy_cidrs and bool(trust_proxy_for_rate_limit) and not safe_rate_limit_trusted_proxy_networks:
+        raise ValueError(
+            "Trusted proxy CIDR allowlist is required when strict proxy trust mode is enabled."
+        )
     app = web.Application(client_max_size=safe_max_body, middlewares=[_error_middleware])
     app[AUTH_TOKEN_KEY] = auth_token.strip() if isinstance(auth_token, str) and auth_token.strip() else None
     app[AUTH_FOR_HEALTH_KEY] = bool(auth_for_health)
@@ -550,6 +562,7 @@ def create_app(
     app[RATE_LIMIT_CLIENT_IP_HEADER_KEY] = safe_rate_limit_header
     app[RATE_LIMIT_TRUSTED_PROXY_CIDRS_KEY] = safe_rate_limit_trusted_proxy_cidrs
     app[RATE_LIMIT_TRUSTED_PROXY_NETWORKS_KEY] = safe_rate_limit_trusted_proxy_networks
+    app[RATE_LIMIT_REQUIRE_TRUSTED_PROXY_CIDRS_KEY] = safe_require_trusted_proxy_cidrs
     app[RATE_LIMIT_STATE_KEY] = {}
     app.router.add_get("/health", health_handler)
     app.router.add_get("/tools", tools_handler)
@@ -639,6 +652,24 @@ def _parse_args() -> argparse.Namespace:
         default=os.getenv("MCP_HTTP_TRUSTED_PROXY_CIDRS", ""),
         help="Comma-separated CIDR allowlist for direct proxy source addresses when trust-proxy mode is enabled.",
     )
+    require_trusted_proxy_cidrs_default = _parse_env_bool(
+        os.getenv("MCP_HTTP_REQUIRE_TRUSTED_PROXY_CIDRS"),
+        default=False,
+    )
+    require_trusted_proxy_group = parser.add_mutually_exclusive_group()
+    require_trusted_proxy_group.add_argument(
+        "--require-trusted-proxy-cidrs",
+        dest="require_trusted_proxy_cidrs",
+        action="store_true",
+        help="Require a non-empty trusted proxy CIDR allowlist when proxy trust is enabled.",
+    )
+    require_trusted_proxy_group.add_argument(
+        "--allow-any-proxy-source",
+        dest="require_trusted_proxy_cidrs",
+        action="store_false",
+        help="Allow proxy trust without enforcing trusted proxy CIDR allowlist presence.",
+    )
+    parser.set_defaults(require_trusted_proxy_cidrs=require_trusted_proxy_cidrs_default)
     parser.add_argument(
         "--rate-limit-window-seconds",
         type=float,
@@ -665,11 +696,17 @@ def _parse_args() -> argparse.Namespace:
     )
     parsed_args = parser.parse_args()
     try:
-        _parse_trusted_proxy_networks(
+        trusted_proxy_networks = _parse_trusted_proxy_networks(
             _normalize_rate_limit_trusted_proxy_cidrs(getattr(parsed_args, "trusted_proxy_cidrs", ""))
         )
     except ValueError as exc:
         parser.error(str(exc))
+    if (
+        bool(getattr(parsed_args, "require_trusted_proxy_cidrs", False))
+        and bool(getattr(parsed_args, "trust_proxy_for_rate_limit", False))
+        and not trusted_proxy_networks
+    ):
+        parser.error("Trusted proxy CIDR allowlist is required when strict proxy trust mode is enabled.")
     return parsed_args
 
 
@@ -685,11 +722,12 @@ def main() -> None:
     logger.info("GET /health auth is %s", "enabled" if bool(args.auth_for_health) else "disabled")
     logger.info("GET /tools auth is %s", "enabled" if bool(args.auth_for_tools) else "disabled")
     logger.info(
-        "POST /mcp/tool rate limit is %s (window=%ss, max_requests=%s, trust_proxy=%s, header=%s)",
+        "POST /mcp/tool rate limit is %s (window=%ss, max_requests=%s, trust_proxy=%s, strict_proxy_allowlist=%s, header=%s)",
         "enabled" if bool(args.rate_limit_enabled) else "disabled",
         max(1.0, float(args.rate_limit_window_seconds)),
         max(1, int(args.rate_limit_max_requests)),
         "enabled" if bool(args.trust_proxy_for_rate_limit) else "disabled",
+        "enabled" if bool(args.require_trusted_proxy_cidrs) else "disabled",
         str(args.rate_limit_client_ip_header or "X-Forwarded-For"),
     )
     logger.info(
@@ -711,6 +749,7 @@ def main() -> None:
             trust_proxy_for_rate_limit=args.trust_proxy_for_rate_limit,
             rate_limit_client_ip_header=args.rate_limit_client_ip_header,
             rate_limit_trusted_proxy_cidrs=args.trusted_proxy_cidrs,
+            require_trusted_proxy_cidrs=args.require_trusted_proxy_cidrs,
         ),
         host=args.host,
         port=args.port,
