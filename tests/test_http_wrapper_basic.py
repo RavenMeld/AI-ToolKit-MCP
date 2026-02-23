@@ -25,7 +25,7 @@ class HttpWrapperBasicTests(AioHTTPTestCase):
         self.assertEqual(payload["status"], "healthy")
 
     async def test_tool_call_success_path(self):
-        mocked_result = [types.TextContent(type="text", text="ok")]
+        mocked_result = [types.TextContent(type="text", text='{"status":"ok","count":2}')]
         with patch(
             "mcp_http_server.handle_call_tool",
             new=AsyncMock(return_value=mocked_result),
@@ -39,9 +39,27 @@ class HttpWrapperBasicTests(AioHTTPTestCase):
         payload = await response.json()
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["tool"], "list-configs")
+        self.assertIn("request_id", payload)
+        self.assertEqual(payload["data"]["status"], "ok")
+        self.assertEqual(payload["data"]["count"], 2)
         self.assertEqual(payload["result"][0]["type"], "text")
-        self.assertEqual(payload["result"][0]["text"], "ok")
+        self.assertEqual(payload["result"][0]["text"], '{"status":"ok","count":2}')
         mocked_handle.assert_awaited_once_with("list-configs", {})
+
+    async def test_tool_call_plain_text_is_normalized(self):
+        mocked_result = [types.TextContent(type="text", text="plain output")]
+        with patch(
+            "mcp_http_server.handle_call_tool",
+            new=AsyncMock(return_value=mocked_result),
+        ):
+            response = await self.client.post(
+                "/mcp/tool",
+                json={"name": "list-configs", "arguments": {}},
+            )
+
+        self.assertEqual(response.status, 200)
+        payload = await response.json()
+        self.assertEqual(payload["data"]["message"], "plain output")
 
     async def test_tool_call_invalid_tool(self):
         response = await self.client.post(
@@ -52,6 +70,50 @@ class HttpWrapperBasicTests(AioHTTPTestCase):
         payload = await response.json()
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["error"]["code"], "TOOL_NOT_FOUND")
+        self.assertIn("request_id", payload)
+
+
+class HttpWrapperAuthTests(AioHTTPTestCase):
+    async def get_application(self):
+        return create_app(auth_token="secret-token")
+
+    async def test_auth_required_without_token(self):
+        response = await self.client.post(
+            "/mcp/tool",
+            json={"name": "list-configs", "arguments": {}},
+        )
+        self.assertEqual(response.status, 401)
+        payload = await response.json()
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "AUTH_REQUIRED")
+
+    async def test_auth_invalid_with_wrong_token(self):
+        response = await self.client.post(
+            "/mcp/tool",
+            json={"name": "list-configs", "arguments": {}},
+            headers={"Authorization": "Bearer wrong-token"},
+        )
+        self.assertEqual(response.status, 403)
+        payload = await response.json()
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "AUTH_INVALID")
+
+    async def test_auth_success_with_api_key_header(self):
+        mocked_result = [types.TextContent(type="text", text='{"ok":true}')]
+        with patch(
+            "mcp_http_server.handle_call_tool",
+            new=AsyncMock(return_value=mocked_result),
+        ):
+            response = await self.client.post(
+                "/mcp/tool",
+                json={"name": "list-configs", "arguments": {}},
+                headers={"X-API-Key": "secret-token"},
+            )
+
+        self.assertEqual(response.status, 200)
+        payload = await response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["data"]["ok"], True)
 
 
 if __name__ == "__main__":

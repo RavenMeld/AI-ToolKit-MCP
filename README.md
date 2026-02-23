@@ -50,6 +50,13 @@ python mcp_server.py
 python mcp_http_server.py --host 127.0.0.1 --port 8080
 ```
 
+To require authentication on `POST /mcp/tool`:
+
+```bash
+export MCP_HTTP_AUTH_TOKEN=change-me
+python mcp_http_server.py --host 127.0.0.1 --port 8080
+```
+
 5. Register this command in your MCP client and call `get-training-observability` with a `job_id`.
 
 ## Architecture At A Glance
@@ -575,6 +582,7 @@ Environment variables used by the server:
 - `AI_TOOLKIT_SERVER_URL` (default: `http://localhost:8675`)
 - `LOG_LEVEL` (default: `INFO`)
 - `COMFYUI_MODEL_ROOTS` (colon-separated model roots)
+- `MCP_HTTP_AUTH_TOKEN` (optional auth token for `/mcp/tool`)
 
 Default data paths in code:
 - `/ai-toolkit/datasets`
@@ -600,6 +608,29 @@ Endpoints:
 - `GET /health`
 - `GET /tools`
 - `POST /mcp/tool` with body: `{"name":"<tool-name>","arguments":{...}}`
+
+Auth for `POST /mcp/tool` when `MCP_HTTP_AUTH_TOKEN` is configured:
+- `Authorization: Bearer <token>`
+- or `X-API-Key: <token>`
+
+Normalized response envelope:
+
+```json
+{
+  "ok": true,
+  "request_id": "1f106cc8-a8dc-4057-94a2-6fd91d9f0e16",
+  "tool": "list-configs",
+  "data": {
+    "status": "ok"
+  },
+  "result": [
+    {
+      "type": "text",
+      "text": "{\"status\":\"ok\"}"
+    }
+  ]
+}
+```
 
 ## MCP Client Wiring (Example)
 
@@ -628,6 +659,7 @@ Current test modules:
 - `tests/test_timeseries_compare_helpers.py`
 - `tests/test_observability_schema_contract.py`
 - `tests/test_http_wrapper_basic.py`
+- `tests/test_get_training_observability_smoke.py`
 
 Optional syntax check:
 
