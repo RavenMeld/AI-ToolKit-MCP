@@ -57,6 +57,14 @@ export MCP_HTTP_AUTH_TOKEN=change-me
 python mcp_http_server.py --host 127.0.0.1 --port 8080
 ```
 
+Optional hardening knobs:
+
+```bash
+export MCP_HTTP_TOOL_TIMEOUT_SECONDS=120
+export MCP_HTTP_MAX_BODY_BYTES=1048576
+python mcp_http_server.py --host 127.0.0.1 --port 8080
+```
+
 5. Register this command in your MCP client and call `get-training-observability` with a `job_id`.
 
 ## Architecture At A Glance
@@ -583,6 +591,8 @@ Environment variables used by the server:
 - `LOG_LEVEL` (default: `INFO`)
 - `COMFYUI_MODEL_ROOTS` (colon-separated model roots)
 - `MCP_HTTP_AUTH_TOKEN` (optional auth token for `/mcp/tool`)
+- `MCP_HTTP_TOOL_TIMEOUT_SECONDS` (default: `120`)
+- `MCP_HTTP_MAX_BODY_BYTES` (default: `1048576` / `1MB`)
 
 Default data paths in code:
 - `/ai-toolkit/datasets`
@@ -604,6 +614,11 @@ The process starts an MCP stdio server (`server_name=ai-toolkit-mcp`).
 python mcp_http_server.py --host 127.0.0.1 --port 8080
 ```
 
+CLI flags:
+- `--auth-token`
+- `--tool-timeout-seconds`
+- `--max-body-bytes`
+
 Endpoints:
 - `GET /health`
 - `GET /tools`
@@ -612,6 +627,10 @@ Endpoints:
 Auth for `POST /mcp/tool` when `MCP_HTTP_AUTH_TOKEN` is configured:
 - `Authorization: Bearer <token>`
 - or `X-API-Key: <token>`
+
+Hardening error codes:
+- `TOOL_TIMEOUT` (`504`) when execution exceeds `MCP_HTTP_TOOL_TIMEOUT_SECONDS`
+- `PAYLOAD_TOO_LARGE` (`413`) when body exceeds `MCP_HTTP_MAX_BODY_BYTES`
 
 Normalized response envelope:
 

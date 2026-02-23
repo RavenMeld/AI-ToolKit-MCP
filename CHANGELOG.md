@@ -7,12 +7,18 @@ All notable changes to this project are documented in this file.
 ### Added
 - Optional HTTP auth token for `mcp_http_server.py` via `MCP_HTTP_AUTH_TOKEN`.
   - Accepted headers: `Authorization: Bearer <token>` or `X-API-Key: <token>`.
+- HTTP hardening controls:
+  - `MCP_HTTP_TOOL_TIMEOUT_SECONDS` for per-request execution timeout
+  - `MCP_HTTP_MAX_BODY_BYTES` for request body size limit
 
 ### Changed
 - Normalized HTTP tool response envelope now includes:
   - `request_id`
   - `data` (parsed JSON-first payload for automation)
   - `result` (raw MCP content list retained for compatibility)
+- HTTP wrapper returns structured error codes for hardening failures:
+  - `TOOL_TIMEOUT` (`504`)
+  - `PAYLOAD_TOO_LARGE` (`413`)
 
 ## [0.1.0] - 2026-02-23
 

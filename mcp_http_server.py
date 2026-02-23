@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import asyncio
 import hmac
 import json
 import logging
@@ -13,6 +14,9 @@ from mcp_server import MCP_TOOLS, handle_call_tool, handle_list_tools
 
 logger = logging.getLogger(__name__)
 AUTH_TOKEN_KEY = web.AppKey("auth_token", Optional[str])
+TOOL_TIMEOUT_SECONDS_KEY = web.AppKey("tool_timeout_seconds", float)
+MAX_BODY_BYTES_KEY = web.AppKey("max_body_bytes", int)
+REQUEST_ID_KEY = web.AppKey("request_id", str)
 
 
 def _error_response(
@@ -63,6 +67,9 @@ def _serialize_tool(tool: Any) -> Dict[str, Any]:
 
 
 def _request_id_from_request(request: web.Request) -> str:
+    existing = request.get(REQUEST_ID_KEY)
+    if isinstance(existing, str) and existing:
+        return existing
     candidate = request.headers.get("X-Request-ID")
     if candidate and candidate.strip():
         return candidate.strip()
@@ -128,11 +135,33 @@ def _normalize_tool_data(serialized_items: List[Dict[str, Any]]) -> Any:
     return {"items": parsed_items}
 
 
+@web.middleware
+async def _error_middleware(
+    request: web.Request,
+    handler: Any,
+) -> web.StreamResponse:
+    request_id = _request_id_from_request(request)
+    request[REQUEST_ID_KEY] = request_id
+    try:
+        return await handler(request)
+    except web.HTTPRequestEntityTooLarge:
+        max_body_bytes = int(request.app.get(MAX_BODY_BYTES_KEY, 0))
+        return _error_response(
+            413,
+            "PAYLOAD_TOO_LARGE",
+            "Request body exceeds configured size limit.",
+            request_id=request_id,
+            details={"max_body_bytes": max_body_bytes},
+        )
+
+
 async def health_handler(_request: web.Request) -> web.Response:
+    request_id = _request_id_from_request(_request)
     auth_enabled = bool(_request.app.get(AUTH_TOKEN_KEY))
     return web.json_response(
         {
             "ok": True,
+            "request_id": request_id,
             "status": "healthy",
             "service": "ai-toolkit-mcp-http",
             "auth_enabled": auth_enabled,
@@ -141,9 +170,17 @@ async def health_handler(_request: web.Request) -> web.Response:
 
 
 async def tools_handler(_request: web.Request) -> web.Response:
+    request_id = _request_id_from_request(_request)
     tools = await handle_list_tools()
     serialized = [_serialize_tool(tool) for tool in tools]
-    return web.json_response({"ok": True, "count": len(serialized), "tools": serialized})
+    return web.json_response(
+        {
+            "ok": True,
+            "request_id": request_id,
+            "count": len(serialized),
+            "tools": serialized,
+        }
+    )
 
 
 async def mcp_tool_handler(request: web.Request) -> web.Response:
@@ -214,8 +251,17 @@ async def mcp_tool_handler(request: web.Request) -> web.Response:
             details={"available_tools": MCP_TOOLS},
         )
 
+    timeout_seconds = float(request.app.get(TOOL_TIMEOUT_SECONDS_KEY, 120.0) or 120.0)
     try:
-        result = await handle_call_tool(name, arguments)
+        result = await asyncio.wait_for(handle_call_tool(name, arguments), timeout=timeout_seconds)
+    except asyncio.TimeoutError:
+        return _error_response(
+            504,
+            "TOOL_TIMEOUT",
+            f"Tool execution exceeded timeout of {timeout_seconds:.2f}s.",
+            request_id=request_id,
+            details={"tool_timeout_seconds": timeout_seconds},
+        )
     except ValueError as exc:
         return _error_response(
             404,
@@ -246,9 +292,17 @@ async def mcp_tool_handler(request: web.Request) -> web.Response:
     )
 
 
-def create_app(auth_token: Optional[str] = None) -> web.Application:
-    app = web.Application()
+def create_app(
+    auth_token: Optional[str] = None,
+    tool_timeout_seconds: float = 120.0,
+    max_body_bytes: int = 1024 * 1024,
+) -> web.Application:
+    safe_timeout = max(0.01, float(tool_timeout_seconds))
+    safe_max_body = max(1, int(max_body_bytes))
+    app = web.Application(client_max_size=safe_max_body, middlewares=[_error_middleware])
     app[AUTH_TOKEN_KEY] = auth_token.strip() if isinstance(auth_token, str) and auth_token.strip() else None
+    app[TOOL_TIMEOUT_SECONDS_KEY] = safe_timeout
+    app[MAX_BODY_BYTES_KEY] = safe_max_body
     app.router.add_get("/health", health_handler)
     app.router.add_get("/tools", tools_handler)
     app.router.add_post("/mcp/tool", mcp_tool_handler)
@@ -264,6 +318,18 @@ def _parse_args() -> argparse.Namespace:
         default=os.getenv("MCP_HTTP_AUTH_TOKEN"),
         help="Optional auth token accepted via Authorization: Bearer <token> or X-API-Key.",
     )
+    parser.add_argument(
+        "--tool-timeout-seconds",
+        type=float,
+        default=float(os.getenv("MCP_HTTP_TOOL_TIMEOUT_SECONDS", "120")),
+        help="Timeout for each tool execution request.",
+    )
+    parser.add_argument(
+        "--max-body-bytes",
+        type=int,
+        default=int(os.getenv("MCP_HTTP_MAX_BODY_BYTES", str(1024 * 1024))),
+        help="Maximum accepted HTTP request body size in bytes.",
+    )
     return parser.parse_args()
 
 
@@ -276,7 +342,17 @@ def main() -> None:
     auth_enabled = bool(args.auth_token)
     logger.info("Starting HTTP wrapper on %s:%s", args.host, args.port)
     logger.info("HTTP auth is %s", "enabled" if auth_enabled else "disabled")
-    web.run_app(create_app(auth_token=args.auth_token), host=args.host, port=args.port)
+    logger.info("Tool timeout: %.2fs", max(0.01, float(args.tool_timeout_seconds)))
+    logger.info("Max request body bytes: %d", max(1, int(args.max_body_bytes)))
+    web.run_app(
+        create_app(
+            auth_token=args.auth_token,
+            tool_timeout_seconds=args.tool_timeout_seconds,
+            max_body_bytes=args.max_body_bytes,
+        ),
+        host=args.host,
+        port=args.port,
+    )
 
 
 if __name__ == "__main__":

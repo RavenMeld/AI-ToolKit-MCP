@@ -1,3 +1,4 @@
+import asyncio
 import sys
 import unittest
 from pathlib import Path
@@ -22,6 +23,7 @@ class HttpWrapperBasicTests(AioHTTPTestCase):
         self.assertEqual(response.status, 200)
         payload = await response.json()
         self.assertTrue(payload["ok"])
+        self.assertIn("request_id", payload)
         self.assertEqual(payload["status"], "healthy")
 
     async def test_tool_call_success_path(self):
@@ -114,6 +116,40 @@ class HttpWrapperAuthTests(AioHTTPTestCase):
         payload = await response.json()
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["data"]["ok"], True)
+
+
+class HttpWrapperHardeningTests(AioHTTPTestCase):
+    async def get_application(self):
+        return create_app(tool_timeout_seconds=0.01, max_body_bytes=128)
+
+    async def test_tool_timeout(self):
+        async def _slow_tool(*_args, **_kwargs):
+            await asyncio.sleep(0.05)
+            return [types.TextContent(type="text", text='{"ok":true}')]
+
+        with patch("mcp_http_server.handle_call_tool", new=_slow_tool):
+            response = await self.client.post(
+                "/mcp/tool",
+                json={"name": "list-configs", "arguments": {}},
+            )
+
+        self.assertEqual(response.status, 504)
+        payload = await response.json()
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "TOOL_TIMEOUT")
+        self.assertIn("tool_timeout_seconds", payload["error"]["details"])
+
+    async def test_payload_too_large(self):
+        response = await self.client.post(
+            "/mcp/tool",
+            json={"name": "list-configs", "arguments": {"blob": "x" * 1024}},
+        )
+
+        self.assertEqual(response.status, 413)
+        payload = await response.json()
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "PAYLOAD_TOO_LARGE")
+        self.assertEqual(payload["error"]["details"]["max_body_bytes"], 128)
 
 
 if __name__ == "__main__":
