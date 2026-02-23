@@ -12,7 +12,7 @@ Plan and deliver all seven improvements for `RavenMeld/AI-ToolKit-MCP`:
 
 ## Current Baseline
 - Main files: `mcp_server.py`, `README.md`, `tests/`
-- Current tests: `tests/test_timeseries_compare_helpers.py`, `tests/test_observability_schema_contract.py`
+- Current test modules: `tests/test_timeseries_compare_helpers.py`, `tests/test_observability_schema_contract.py` (`7` tests total at baseline)
 - No standalone HTTP wrapper in this split repo
 - No CI workflow in this split repo
 - No pinned dependency manifest in this split repo
@@ -194,10 +194,19 @@ Plan and deliver all seven improvements for `RavenMeld/AI-ToolKit-MCP`:
 
 ## Progress Log
 - [x] Planning document created
-- [ ] Phase 0 baseline capture
+- [x] Phase 0 baseline capture
 - [ ] Phase 1 dependencies
 - [ ] Phase 2 HTTP wrapper
 - [ ] Phase 3 docs/examples/schemas
 - [ ] Phase 4 smoke test
 - [ ] Phase 5 CI
 - [ ] Phase 6 release tag
+
+## Phase 0 Results
+- Branch state:
+  - Active branch: `ai-toolkit-mcp-server-split`
+  - Tracks: `ravenmeld-ai/main`
+- Baseline validation:
+  - `python -m py_compile mcp_server.py` -> pass
+  - `python -m unittest discover -s tests -p 'test_*.py'` -> `Ran 7 tests ... OK`
+- Result: baseline is green and ready for implementation Phase 1.
