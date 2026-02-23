@@ -5,10 +5,6 @@ Add an optional, backward-compatible auth requirement for `GET /health` in `mcp_
 
 ## Progress
 - [x] Inspected current `/health` and auth handling.
-- [ ] Implement optional `/health` auth gate via app config.
-- [ ] Add CLI/env wiring for the new toggle.
-- [ ] Add test coverage for default-open and protected `/health` behavior.
-- [ ] Update README and changelog.
 - [x] Implement optional `/health` auth gate via app config.
 - [x] Add CLI/env wiring for the new toggle.
 - [x] Add test coverage for default-open and protected `/health` behavior.
