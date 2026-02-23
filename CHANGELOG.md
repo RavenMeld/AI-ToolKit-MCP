@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+No changes yet.
+
+## [0.1.1] - 2026-02-23
+
 ### Added
 - Optional HTTP auth token for `mcp_http_server.py` via `MCP_HTTP_AUTH_TOKEN`.
   - Accepted headers: `Authorization: Bearer <token>` or `X-API-Key: <token>`.

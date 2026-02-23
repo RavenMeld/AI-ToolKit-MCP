@@ -19,7 +19,7 @@ This repository is intentionally focused:
 
 ## Release Status
 
-- Current tag: `v0.1.0`
+- Current tag: `v0.1.1`
 - Changelog: `CHANGELOG.md`
 - CI: `.github/workflows/ci.yml`
 
