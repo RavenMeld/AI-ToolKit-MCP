@@ -1,5 +1,8 @@
 # AI ToolKit MCP
 
+[![CI](https://github.com/RavenMeld/AI-ToolKit-MCP/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RavenMeld/AI-ToolKit-MCP/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/RavenMeld/AI-ToolKit-MCP)](https://github.com/RavenMeld/AI-ToolKit-MCP/releases/tag/v0.1.0)
+
 AI ToolKit MCP is a Python MCP server that wraps an AI Toolkit training backend and exposes high-value training operations as MCP tools.
 
 This repository is intentionally focused:
@@ -13,6 +16,12 @@ This repository is intentionally focused:
 - Deep observability and run intelligence in one call.
 - Dataset diagnostics and safe auto-improvement actions.
 - Compare-run explainability with explicit provenance metadata.
+
+## Release Status
+
+- Current tag: `v0.1.0`
+- Changelog: `CHANGELOG.md`
+- CI: `.github/workflows/ci.yml`
 
 ## Quick Start (5 Minutes)
 
