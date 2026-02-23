@@ -125,6 +125,14 @@ DELTA_TO_WINNER_NEGLIGIBLE_MAX = 2.0
 DELTA_TO_WINNER_MODERATE_MAX = 8.0
 
 
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _utc_now_iso() -> str:
+    return _utc_now().isoformat().replace("+00:00", "Z")
+
+
 def _delta_band_source_payload() -> Dict[str, Any]:
     """Return provenance metadata for compare-run delta confidence bands."""
     return {
@@ -3315,7 +3323,7 @@ async def collect_observability_snapshot(
     report = {
         "success": True,
         "job_id": job_id,
-        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "generated_at": _utc_now_iso(),
         "overall_health": overall_health_from_alerts(alerts),
         "status_snapshot": status_snapshot,
         "system_snapshot": system_snapshot,
@@ -4631,7 +4639,7 @@ async def handle_call_tool(
             )
 
             result = {
-                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "generated_at": _utc_now_iso(),
                 "inputs": {
                     "goal": goal,
                     "base_model": base_model,
@@ -4965,7 +4973,7 @@ async def handle_call_tool(
 
                 system_snapshot = await client.get_system_stats() if include_system else None
                 point = {
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": _utc_now_iso(),
                     "elapsed_seconds": round(now_ts - started_at, 2),
                     "status": status_snapshot.get("status", "unknown"),
                     "current_step": status_snapshot.get("current_step"),
@@ -5032,7 +5040,7 @@ async def handle_call_tool(
             final_status = await client.get_training_status(job_id)
             result = {
                 "job_id": job_id,
-                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "generated_at": _utc_now_iso(),
                 "window": {
                     "duration_seconds_requested": duration_seconds,
                     "poll_interval_seconds": poll_interval_seconds,
@@ -5145,7 +5153,7 @@ async def handle_call_tool(
 
             ranking = rank_run_comparisons(run_reports)
             result = {
-                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "generated_at": _utc_now_iso(),
                 "inputs": {
                     "job_ids": comparison_job_ids,
                     "requested_job_ids": requested_job_ids,
@@ -5215,7 +5223,7 @@ async def handle_call_tool(
             output_report.pop("config_payload", None)
 
             result = {
-                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "generated_at": _utc_now_iso(),
                 "job_id": job_id,
                 "inputs": {
                     "log_lines": log_lines,
@@ -5305,7 +5313,7 @@ async def handle_call_tool(
                 return [types.TextContent(
                     type="text",
                     text=json.dumps({
-                        "generated_at": datetime.utcnow().isoformat() + "Z",
+                        "generated_at": _utc_now_iso(),
                         "status": "no_evaluable_candidates",
                         "requested_job_ids": candidate_ids,
                         "skipped_candidates": skipped_candidates,
@@ -5329,7 +5337,7 @@ async def handle_call_tool(
             output_report.pop("config_payload", None)
 
             result = {
-                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "generated_at": _utc_now_iso(),
                 "inputs": {
                     "candidate_job_ids": candidate_ids,
                     "log_lines": log_lines,
@@ -5432,7 +5440,7 @@ async def handle_call_tool(
                 dataset_analysis_after, _ = analyze_dataset_folder(dataset_path, max_files=max_dataset_files)
 
             result = {
-                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "generated_at": _utc_now_iso(),
                 "dataset_path": str(dataset_path),
                 "config_name": config_name,
                 "config_source": config_source,
@@ -5514,14 +5522,14 @@ async def handle_call_tool(
                     evaluation = {"error": run_response.get("error", "evaluation_collection_failed")}
 
             report_payload = {
-                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "generated_at": _utc_now_iso(),
                 "job_id": job_id,
                 "snapshot": snapshot,
                 "evaluation": evaluation if include_evaluation else {"skipped": True},
             }
 
             safe_job_id = re.sub(r"[^A-Za-z0-9._-]+", "_", job_id)
-            timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+            timestamp = _utc_now().strftime("%Y%m%d-%H%M%S")
             basename = f"{filename_prefix}-{safe_job_id}-{timestamp}"
             json_path = output_dir / f"{basename}.json"
             md_path = output_dir / f"{basename}.md"
@@ -5719,13 +5727,13 @@ async def handle_call_tool(
                     destination_path = Path(str(destination))
                 else:
                     ALERTS_DIR.mkdir(parents=True, exist_ok=True)
-                    destination_path = ALERTS_DIR / f"alerts-{datetime.utcnow().strftime('%Y%m%d')}.jsonl"
+                    destination_path = ALERTS_DIR / f"alerts-{_utc_now().strftime('%Y%m%d')}.jsonl"
                 destination_path.parent.mkdir(parents=True, exist_ok=True)
 
                 with open(destination_path, "a", encoding="utf-8") as f:
                     for alert in routable_alerts:
                         payload = {
-                            "timestamp": datetime.utcnow().isoformat() + "Z",
+                            "timestamp": _utc_now_iso(),
                             "alert": alert,
                         }
                         if include_context and context_payload:
@@ -5782,7 +5790,7 @@ async def handle_call_tool(
                 )]
 
             result = {
-                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "generated_at": _utc_now_iso(),
                 "min_severity": min_severity,
                 "alerts_in": len(alerts),
                 "alerts_after_severity_filter": len(filtered_alerts),
